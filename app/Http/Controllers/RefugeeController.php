@@ -7,9 +7,11 @@ use App\Models\Household;
 use App\Models\Refugee;
 use App\Models\Shelter;
 use App\Services\AuditLogService;
+use App\Services\HousingService;
 use App\Services\RefugeeRegistrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class RefugeeController extends Controller
@@ -101,11 +103,33 @@ class RefugeeController extends Controller
         ]);
     }
 
-    public function update(Request $request, Refugee $refugee, AuditLogService $auditLog): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        Refugee $refugee,
+        AuditLogService $auditLog,
+        HousingService $housing
+    ): RedirectResponse {
         $data = $request->validate($this->rules($refugee->id));
-        $refugee->update($data);
-        $auditLog->log('update', 'refugees', $refugee, 'تعديل بيانات لاجئ', 'high', $data);
+
+        // Housing is never written straight to the row: it goes through HousingService so
+        // capacity is enforced and a residency_transfers entry is recorded for the move.
+        $campId = (int) $data['current_camp_id'];
+        $shelterId = $data['current_shelter_id'] ?? null;
+        unset($data['current_camp_id'], $data['current_shelter_id'], $data['housing_status']);
+
+        DB::transaction(function () use ($refugee, $data, $campId, $shelterId, $housing, $auditLog): void {
+            $refugee->update($data);
+
+            $housing->transferRefugee(
+                $refugee,
+                $campId,
+                $shelterId === null ? null : (int) $shelterId,
+                'تعديل بيانات اللاجئ',
+                'current_shelter_id'
+            );
+
+            $auditLog->log('update', 'refugees', $refugee, 'تعديل بيانات لاجئ', 'high', $data);
+        });
 
         return redirect()->route('refugees.show', $refugee)->with('success', 'تم تعديل بيانات اللاجئ.');
     }

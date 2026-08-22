@@ -30,6 +30,8 @@
             <button class="primary" type="submit"><i data-lucide="log-in"></i><span>دخول</span></button>
         </form>
 
+        <p class="muted small"><a href="{{ route('password.request') }}">نسيت كلمة المرور؟</a></p>
+
         <!--<p class="muted small">admin@camp.local / password</p>-->
     </section>
 </main>

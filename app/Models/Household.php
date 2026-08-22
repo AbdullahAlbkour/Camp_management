@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Household extends Model
 {
+    use HasFactory;
+
     protected $fillable = ['household_code', 'head_of_household_id', 'notes', 'status'];
 
     public function head(): BelongsTo

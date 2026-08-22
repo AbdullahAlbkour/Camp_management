@@ -52,6 +52,10 @@
                 @role('admin','manager')<a @class(['active' => request()->routeIs('audit.*')]) href="{{ route('audit.index') }}"><i data-lucide="history"></i><span>سجل التدقيق</span></a>@endrole
             </nav>
 
+            <a class="profile-link @if(request()->routeIs('profile.*')) active @endif" href="{{ route('profile.edit') }}">
+                <i data-lucide="user-round-cog"></i><span>{{ auth()->user()->name }}</span>
+            </a>
+
             <form method="post" action="{{ route('logout') }}" class="logout-form">
                 @csrf
                 <button type="submit"><i data-lucide="log-out"></i><span>خروج</span></button>

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\MedicalRecord;
 use App\Models\MedicalService;
-use App\Models\Refugee;
 use App\Services\AuditLogService;
 use App\Services\MedicalRecordService;
 use Illuminate\Http\RedirectResponse;

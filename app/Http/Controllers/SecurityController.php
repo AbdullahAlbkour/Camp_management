@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Camp;
 use App\Models\Checkpoint;
 use App\Models\EntryExitLog;
-use App\Models\Refugee;
 use App\Models\SecurityReport;
 use App\Services\AuditLogService;
 use App\Services\MovementSecurityService;

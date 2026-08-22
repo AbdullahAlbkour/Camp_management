@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SecurityReport extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'refugee_id',
         'camp_id',

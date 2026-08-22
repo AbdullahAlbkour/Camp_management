@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\AidDistribution;
-use App\Models\AuditLog;
 use App\Models\Camp;
 use App\Models\EntryExitLog;
 use App\Models\Household;
 use App\Models\MedicalRecord;
 use App\Models\Refugee;
+use App\Models\ResidencyTransfer;
 use App\Models\SecurityReport;
 use App\Models\Shelter;
 use App\Services\AuditLogService;
@@ -67,7 +67,7 @@ class ReportController extends Controller
         return match ($report) {
             'households' => Household::query()->with('head')->withCount('members'),
             'shelters' => Shelter::query()->with('camp')->withCount('refugees')->when($campId, fn ($q) => $q->where('camp_id', $campId)),
-            'transfers' => \App\Models\ResidencyTransfer::query()->with('refugee')->when($from, fn ($q) => $q->whereDate('transferred_at', '>=', $from))->when($to, fn ($q) => $q->whereDate('transferred_at', '<=', $to)),
+            'transfers' => ResidencyTransfer::query()->with('refugee')->when($from, fn ($q) => $q->whereDate('transferred_at', '>=', $from))->when($to, fn ($q) => $q->whereDate('transferred_at', '<=', $to)),
             'aid' => AidDistribution::query()->with(['aidType', 'refugee', 'household', 'camp'])->when($campId, fn ($q) => $q->where('camp_id', $campId))->when($from, fn ($q) => $q->whereDate('distribution_date', '>=', $from))->when($to, fn ($q) => $q->whereDate('distribution_date', '<=', $to)),
             'medical' => $this->medicalReportQuery($campId, $from, $to),
             'movement' => EntryExitLog::query()->with(['refugee', 'camp', 'checkpoint'])->when($campId, fn ($q) => $q->where('camp_id', $campId))->when($from, fn ($q) => $q->whereDate('movement_datetime', '>=', $from))->when($to, fn ($q) => $q->whereDate('movement_datetime', '<=', $to)),

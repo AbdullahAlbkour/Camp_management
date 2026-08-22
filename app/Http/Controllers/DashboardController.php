@@ -13,10 +13,10 @@ use App\Models\ResidencyTransfer;
 use App\Models\SecurityReport;
 use App\Models\Shelter;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
