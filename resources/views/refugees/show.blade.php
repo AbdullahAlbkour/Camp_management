@@ -4,7 +4,7 @@
 <section class="profile-head">
     <div>
         <h2>{{ $refugee->full_name }}</h2>
-        <p>{{ $refugee->document_number ?? 'بدون رقم وثيقة' }}</p>
+        <p>{{ $refugee->badge_code }} • {{ $refugee->document_number ?? 'بدون رقم وثيقة' }}</p>
     </div>
     <div class="actions">
         @role('admin','registration_officer')
@@ -13,6 +13,7 @@
         @role('admin','housing_officer')
             <a class="primary" href="{{ route('housing.transfer.form', $refugee) }}"><i data-lucide="bed"></i><span>السكن</span></a>
         @endrole
+        <a class="secondary" target="_blank" href="{{ route('refugees.card', $refugee) }}"><i data-lucide="id-card"></i><span>بطاقة التعريف</span></a>
     </div>
 </section>
 
@@ -24,9 +25,9 @@
             <p>{{ $refugee->document_number ?? 'بدون رقم وثيقة' }}</p>
         </div>
         <div class="summary-badges">
-            <span class="badge {{ $refugee->status }}">{{ $refugee->status }}</span>
+            <span class="badge {{ $refugee->status }}">{{ \App\Support\Labels::get('refugee_status', $refugee->status) }}</span>
             <span class="badge {{ $refugee->housing_status }}">{{ $refugee->currentShelter?->display_name ?? 'بدون سكن' }}</span>
-            <span class="badge">{{ $refugee->presence_status === 'inside' ? 'داخل المخيم' : 'خارج المخيم' }}</span>
+            <span class="badge">{{ \App\Support\Labels::get('presence_status', $refugee->presence_status) }}</span>
         </div>
     </article>
 

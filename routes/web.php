@@ -12,8 +12,10 @@ use App\Http\Controllers\MedicalController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RefugeeCardController;
 use App\Http\Controllers\RefugeeController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ShelterController;
 use App\Http\Controllers\UserController;
@@ -41,6 +43,9 @@ Route::middleware('auth')->group(function (): void {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
+    Route::get('/search', [SearchController::class, 'index'])->name('search.index');
+    Route::get('/search/suggest', [SearchController::class, 'suggest'])->name('search.suggest');
+
     Route::get('/lookups/refugees', [LookupController::class, 'refugees'])->name('lookups.refugees');
     Route::get('/lookups/households', [LookupController::class, 'households'])->name('lookups.households');
 
@@ -53,6 +58,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/refugees/create', [RefugeeController::class, 'create'])->name('refugees.create')->middleware('role:admin,registration_officer');
     Route::post('/refugees', [RefugeeController::class, 'store'])->name('refugees.store')->middleware('role:admin,registration_officer');
     Route::get('/refugees/{refugee}', [RefugeeController::class, 'show'])->name('refugees.show');
+    Route::get('/refugees/{refugee}/card', RefugeeCardController::class)->name('refugees.card');
     Route::get('/refugees/{refugee}/edit', [RefugeeController::class, 'edit'])->name('refugees.edit')->middleware('role:admin,registration_officer');
     Route::put('/refugees/{refugee}', [RefugeeController::class, 'update'])->name('refugees.update')->middleware('role:admin,registration_officer');
 

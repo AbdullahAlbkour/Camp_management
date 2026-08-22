@@ -69,6 +69,14 @@
                     <h1>{{ $title ?? 'النظام' }}</h1>
                     <p data-live-clock>{{ now()->format('H:i Y-m-d') }}</p>
                 </div>
+
+                <form class="global-search" method="get" action="{{ route('search.index') }}" role="search"
+                      data-global-search="{{ route('search.suggest') }}">
+                    <i data-lucide="search"></i>
+                    <input type="search" name="q" value="{{ request('q') }}" autocomplete="off"
+                           placeholder="بحث سريع: اسم، وثيقة، هاتف، رمز أسرة..." aria-label="بحث سريع">
+                    <div class="global-search-panel" role="listbox" hidden></div>
+                </form>
             </header>
 
             @include('layouts.flash')

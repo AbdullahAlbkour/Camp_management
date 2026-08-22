@@ -38,9 +38,30 @@ class Refugee extends Model
         ];
     }
 
+    /**
+     * Father's name is optional, so the parts are joined rather than concatenated:
+     * a plain concatenation left a doubled space in the middle of every name
+     * belonging to a refugee registered without one.
+     */
     public function getFullNameAttribute(): string
     {
-        return trim($this->first_name.' '.$this->father_name.' '.$this->last_name);
+        return collect([$this->first_name, $this->father_name, $this->last_name])
+            ->map(fn (?string $part) => trim((string) $part))
+            ->filter()
+            ->implode(' ');
+    }
+
+    /**
+     * Stable, human-readable identifier printed and encoded on the refugee's badge.
+     */
+    public function getBadgeCodeAttribute(): string
+    {
+        return 'REF-'.str_pad((string) $this->id, 6, '0', STR_PAD_LEFT);
+    }
+
+    public function getAgeAttribute(): ?int
+    {
+        return $this->date_of_birth?->age;
     }
 
     public function currentCamp(): BelongsTo
