@@ -20,12 +20,19 @@ use Illuminate\Support\Facades\DB;
 class DemoLargeDatasetSeeder extends Seeder
 {
     private const REFUGEE_COUNT = 2000;
+
     private const HOUSEHOLD_COUNT = 200;
+
     private const CAMP_COUNT = 10;
+
     private const SHELTERS_PER_CAMP = 35;
+
     private const MEDICAL_RECORD_COUNT = 800;
+
     private const SECURITY_REPORT_COUNT = 500;
+
     private const MOVEMENT_COUNT = 1500;
+
     private const AID_DISTRIBUTION_COUNT = 700;
 
     public function run(): void

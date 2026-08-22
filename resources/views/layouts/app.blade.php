@@ -49,8 +49,13 @@
                 @role('admin','security_officer')<a @class(['active' => request()->routeIs('security.checkpoints*')]) href="{{ route('security.checkpoints') }}"><i data-lucide="scan-line"></i><span>نقاط التفتيش</span></a>@endrole
                 <a @class(['active' => request()->routeIs('reports.*')]) href="{{ route('reports.index') }}"><i data-lucide="bar-chart-3"></i><span>التقارير</span></a>
                 <a @class(['active' => request()->routeIs('notifications.*')]) href="{{ route('notifications.index') }}"><i data-lucide="bell"></i><span>التنبيهات</span></a>
+                @role('admin','housing_officer','registration_officer','aid_officer')<a @class(['active' => request()->routeIs('archive.*')]) href="{{ route('archive.index') }}"><i data-lucide="archive"></i><span>الأرشيف</span></a>@endrole
                 @role('admin','manager')<a @class(['active' => request()->routeIs('audit.*')]) href="{{ route('audit.index') }}"><i data-lucide="history"></i><span>سجل التدقيق</span></a>@endrole
             </nav>
+
+            <a class="profile-link @if(request()->routeIs('profile.*')) active @endif" href="{{ route('profile.edit') }}">
+                <i data-lucide="user-round-cog"></i><span>{{ auth()->user()->name }}</span>
+            </a>
 
             <form method="post" action="{{ route('logout') }}" class="logout-form">
                 @csrf
@@ -65,6 +70,14 @@
                     <h1>{{ $title ?? 'النظام' }}</h1>
                     <p data-live-clock>{{ now()->format('H:i Y-m-d') }}</p>
                 </div>
+
+                <form class="global-search" method="get" action="{{ route('search.index') }}" role="search"
+                      data-global-search="{{ route('search.suggest') }}">
+                    <i data-lucide="search"></i>
+                    <input type="search" name="q" value="{{ request('q') }}" autocomplete="off"
+                           placeholder="بحث سريع: اسم، وثيقة، هاتف، رمز أسرة..." aria-label="بحث سريع">
+                    <div class="global-search-panel" role="listbox" hidden></div>
+                </form>
             </header>
 
             @include('layouts.flash')

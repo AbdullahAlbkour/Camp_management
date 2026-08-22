@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AidDistributionRequest;
+use App\Http\Requests\AidTypeRequest;
+use App\Http\Requests\OrganizationRequest;
 use App\Models\AidDistribution;
 use App\Models\AidType;
 use App\Models\Camp;
-use App\Models\Household;
 use App\Models\Organization;
-use App\Models\Refugee;
 use App\Services\AidDistributionService;
 use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class AidController extends Controller
@@ -37,16 +37,9 @@ class AidController extends Controller
         return $this->organizationForm(new Organization, route('aid.organizations.store'), 'POST', 'إضافة جهة داعمة');
     }
 
-    public function storeOrganization(Request $request, AuditLogService $auditLog): RedirectResponse
+    public function storeOrganization(OrganizationRequest $request, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:organizations,name'],
-            'contact_name' => ['nullable', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email'],
-            'status' => ['required', 'in:active,inactive'],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $organization = Organization::create($data);
         $auditLog->log('create', 'organizations', $organization, 'إضافة جهة داعمة', 'medium', $data);
@@ -59,16 +52,9 @@ class AidController extends Controller
         return $this->organizationForm($organization, route('aid.organizations.update', $organization), 'PUT', 'تعديل جهة داعمة');
     }
 
-    public function updateOrganization(Request $request, Organization $organization, AuditLogService $auditLog): RedirectResponse
+    public function updateOrganization(OrganizationRequest $request, Organization $organization, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:organizations,name,'.$organization->id],
-            'contact_name' => ['nullable', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email'],
-            'status' => ['required', 'in:active,inactive'],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $organization->update($data);
         $auditLog->log('update', 'organizations', $organization, 'تعديل جهة داعمة', 'medium', $data);
@@ -97,15 +83,9 @@ class AidController extends Controller
         return $this->aidTypeForm(new AidType, route('aid.types.store'), 'POST', 'إضافة نوع مساعدة');
     }
 
-    public function storeAidType(Request $request, AuditLogService $auditLog): RedirectResponse
+    public function storeAidType(AidTypeRequest $request, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate([
-            'organization_id' => ['nullable', 'exists:organizations,id'],
-            'name' => ['required', 'string', 'max:255'],
-            'unit' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'status' => ['required', 'in:active,inactive'],
-        ]);
+        $data = $request->validated();
 
         $aidType = AidType::create($data);
         $auditLog->log('create', 'aid_types', $aidType, 'إضافة نوع مساعدة', 'medium', $data);
@@ -118,15 +98,9 @@ class AidController extends Controller
         return $this->aidTypeForm($aidType, route('aid.types.update', $aidType), 'PUT', 'تعديل نوع مساعدة');
     }
 
-    public function updateAidType(Request $request, AidType $aidType, AuditLogService $auditLog): RedirectResponse
+    public function updateAidType(AidTypeRequest $request, AidType $aidType, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate([
-            'organization_id' => ['nullable', 'exists:organizations,id'],
-            'name' => ['required', 'string', 'max:255'],
-            'unit' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'status' => ['required', 'in:active,inactive'],
-        ]);
+        $data = $request->validated();
 
         $aidType->update($data);
         $auditLog->log('update', 'aid_types', $aidType, 'تعديل نوع مساعدة', 'medium', $data);
@@ -176,17 +150,9 @@ class AidController extends Controller
         ]);
     }
 
-    public function storeDistribution(Request $request, AidDistributionService $service): RedirectResponse
+    public function storeDistribution(AidDistributionRequest $request, AidDistributionService $service): RedirectResponse
     {
-        $data = $request->validate([
-            'aid_type_id' => ['required', 'exists:aid_types,id'],
-            'refugee_id' => ['nullable', 'exists:refugees,id'],
-            'household_id' => ['nullable', 'exists:households,id'],
-            'camp_id' => ['nullable', 'exists:camps,id'],
-            'quantity' => ['required', 'numeric', 'min:0.01'],
-            'distribution_date' => ['required', 'date'],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $service->distribute($data);
 

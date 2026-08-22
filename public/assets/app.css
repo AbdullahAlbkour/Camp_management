@@ -2242,3 +2242,166 @@ label {
         justify-content: flex-start;
     }
 }
+
+/* ---- Profile link in the sidebar footer ---- */
+.profile-link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 0.85rem;
+    margin: 0 0.75rem 0.35rem;
+    border-radius: 0.75rem;
+    color: inherit;
+    text-decoration: none;
+    font-size: 0.9rem;
+    opacity: 0.85;
+    overflow: hidden;
+}
+
+.profile-link:hover,
+.profile-link.active {
+    background: rgba(255, 255, 255, 0.08);
+    opacity: 1;
+}
+
+.profile-link span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- Global search in the top bar ---- */
+.global-search {
+    position: relative;
+    margin-inline-start: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: min(360px, 40vw);
+}
+
+.global-search > i {
+    position: absolute;
+    inset-inline-start: 0.75rem;
+    width: 18px;
+    height: 18px;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.global-search input[type="search"] {
+    width: 100%;
+    padding: 0.6rem 2.4rem 0.6rem 0.9rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.9);
+    font: inherit;
+    font-size: 0.9rem;
+}
+
+.global-search input[type="search"]:focus {
+    outline: 2px solid rgba(31, 111, 92, 0.35);
+    outline-offset: 1px;
+}
+
+.global-search-panel {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    inset-inline: 0;
+    z-index: 40;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 0.9rem;
+    box-shadow: 0 18px 40px rgba(15, 47, 40, 0.18);
+    padding: 0.4rem;
+}
+
+.global-search-panel[hidden] { display: none; }
+
+.global-search-panel .group-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.55;
+    padding: 0.5rem 0.65rem 0.25rem;
+}
+
+.global-search-panel a {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.1rem 0.75rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.6rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.global-search-panel a:hover,
+.global-search-panel a.is-active {
+    background: rgba(31, 111, 92, 0.09);
+}
+
+.global-search-panel a strong { font-size: 0.9rem; font-weight: 600; }
+.global-search-panel a em { font-style: normal; font-size: 0.75rem; opacity: 0.6; grid-row: 1; }
+.global-search-panel a span { font-size: 0.78rem; opacity: 0.65; grid-column: 1 / -1; }
+.global-search-panel .empty-hint { padding: 0.9rem 0.65rem; font-size: 0.85rem; opacity: 0.6; }
+
+/* ---- Full search results page ---- */
+.search-group h3 { display: flex; align-items: center; gap: 0.5rem; }
+.search-group h3 i { width: 18px; height: 18px; }
+
+.search-results { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.35rem; }
+
+.search-results a {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.15rem 1rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid rgba(0, 0, 0, 0.07);
+    border-radius: 0.7rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.search-results a:hover { background: rgba(31, 111, 92, 0.07); }
+.search-results a strong { font-size: 0.95rem; }
+.search-results a em { font-style: normal; font-size: 0.8rem; opacity: 0.6; }
+.search-results a span { grid-column: 1 / -1; font-size: 0.82rem; opacity: 0.7; }
+
+@media (max-width: 800px) {
+    .global-search { min-width: 0; flex: 1; }
+    .global-search input[type="search"]::placeholder { font-size: 0.8rem; }
+}
+
+/* ---- Attachments on a record profile ---- */
+.attachment-list { list-style: none; margin: 0.5rem 0 1rem; padding: 0; display: grid; gap: 0.4rem; }
+
+.attachment-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.7rem;
+}
+
+.attachment-list li > i { width: 20px; height: 20px; opacity: 0.6; flex: none; }
+.attachment-list li > div { flex: 1; min-width: 0; display: grid; gap: 0.1rem; }
+.attachment-list li a { font-weight: 600; text-decoration: none; color: inherit; word-break: break-word; }
+.attachment-list li a:hover { text-decoration: underline; }
+.attachment-list li small { font-size: 0.76rem; opacity: 0.62; }
+
+.attachment-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+    padding-top: 0.75rem;
+    border-top: 1px dashed rgba(0, 0, 0, 0.12);
+}
+
+.attachment-form label { display: grid; gap: 0.3rem; font-size: 0.83rem; }
+.attachment-form input, .attachment-form select { font: inherit; padding: 0.5rem; border-radius: 0.6rem; border: 1px solid rgba(0, 0, 0, 0.14); }

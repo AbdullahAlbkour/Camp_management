@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AidController;
+use App\Http\Controllers\ArchiveController;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CampController;
@@ -10,8 +12,12 @@ use App\Http\Controllers\HousingController;
 use App\Http\Controllers\LookupController;
 use App\Http\Controllers\MedicalController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RefugeeCardController;
 use App\Http\Controllers\RefugeeController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ShelterController;
 use App\Http\Controllers\UserController;
@@ -22,6 +28,11 @@ Route::get('/favicon.ico', fn () => response()->noContent())->name('favicon');
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.store');
+
+    Route::get('/forgot-password', [PasswordResetController::class, 'showLinkRequest'])->name('password.request');
+    Route::post('/forgot-password', [PasswordResetController::class, 'sendLink'])->middleware('throttle:6,1')->name('password.email');
+    Route::get('/reset-password/{token}', [PasswordResetController::class, 'showReset'])->name('password.reset');
+    Route::post('/reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:6,1')->name('password.update');
 });
 
 Route::middleware('auth')->group(function (): void {
@@ -29,6 +40,13 @@ Route::middleware('auth')->group(function (): void {
     Route::redirect('/', '/dashboard');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/dashboard/live', [DashboardController::class, 'live'])->name('dashboard.live');
+
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+
+    Route::get('/search', [SearchController::class, 'index'])->name('search.index');
+    Route::get('/search/suggest', [SearchController::class, 'suggest'])->name('search.suggest');
 
     Route::get('/lookups/refugees', [LookupController::class, 'refugees'])->name('lookups.refugees');
     Route::get('/lookups/households', [LookupController::class, 'households'])->name('lookups.households');
@@ -42,6 +60,8 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/refugees/create', [RefugeeController::class, 'create'])->name('refugees.create')->middleware('role:admin,registration_officer');
     Route::post('/refugees', [RefugeeController::class, 'store'])->name('refugees.store')->middleware('role:admin,registration_officer');
     Route::get('/refugees/{refugee}', [RefugeeController::class, 'show'])->name('refugees.show');
+    Route::get('/refugees/{refugee}/card', RefugeeCardController::class)->name('refugees.card');
+    Route::post('/refugees/{refugee}/attachments', [AttachmentController::class, 'store'])->name('refugees.attachments.store')->middleware('role:admin,registration_officer,medical_officer');
     Route::get('/refugees/{refugee}/edit', [RefugeeController::class, 'edit'])->name('refugees.edit')->middleware('role:admin,registration_officer');
     Route::put('/refugees/{refugee}', [RefugeeController::class, 'update'])->name('refugees.update')->middleware('role:admin,registration_officer');
 
@@ -104,13 +124,23 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/reports', [SecurityController::class, 'storeReport'])->name('reports.store');
     });
 
-    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index')->middleware('role:admin,manager,registration_officer,housing_officer,aid_officer,medical_officer,security_officer');
-    Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export')->middleware('role:admin,manager,registration_officer,housing_officer,aid_officer,medical_officer,security_officer');
-    Route::get('/reports/print', [ReportController::class, 'printable'])->name('reports.print')->middleware('role:admin,manager,registration_officer,housing_officer,aid_officer,medical_officer,security_officer');
+    // Per-report authorization lives in ReportRegistry, which also decides which
+    // reports appear in the picker, so the routes only require a signed-in user.
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
+    Route::get('/reports/print', [ReportController::class, 'printable'])->name('reports.print');
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/{notification}/resolve', [NotificationController::class, 'resolve'])->name('notifications.resolve');
+
+    Route::get('/attachments/{attachment}', [AttachmentController::class, 'download'])->name('attachments.download');
+    Route::delete('/attachments/{attachment}', [AttachmentController::class, 'destroy'])->name('attachments.destroy')->middleware('role:admin,registration_officer,medical_officer');
+
+    // Archiving is a soft delete: rows stay so historical records keep resolving.
+    Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
+    Route::delete('/archive/{resource}/{id}', [ArchiveController::class, 'archive'])->whereNumber('id')->name('archive.store');
+    Route::post('/archive/{resource}/{id}/restore', [ArchiveController::class, 'restore'])->whereNumber('id')->name('archive.restore');
 
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit.index')->middleware('role:admin,manager');
 });

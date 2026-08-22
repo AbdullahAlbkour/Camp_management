@@ -14,28 +14,52 @@ class HousingService
     public function __construct(
         private readonly AuditLogService $auditLog,
         private readonly NotificationService $notifications
-    ) {
-    }
+    ) {}
 
-    public function transferRefugee(Refugee $refugee, int $campId, ?int $shelterId, ?string $reason = null): Refugee
-    {
-        return DB::transaction(function () use ($refugee, $campId, $shelterId, $reason): Refugee {
+    /**
+     * Move a refugee to a camp/shelter, enforcing capacity and writing the residency trail.
+     *
+     * The call is a no-op when the refugee already lives there, so it is safe to run on
+     * every profile save without polluting the transfer history.
+     *
+     * @param  string  $errorKey  Field name validation errors are attached to, so both the
+     *                            transfer form and the refugee form highlight the right input.
+     */
+    public function transferRefugee(
+        Refugee $refugee,
+        int $campId,
+        ?int $shelterId,
+        ?string $reason = null,
+        string $errorKey = 'shelter_id'
+    ): Refugee {
+        return DB::transaction(function () use ($refugee, $campId, $shelterId, $reason, $errorKey): Refugee {
             $refugee = Refugee::query()->lockForUpdate()->findOrFail($refugee->id);
-            $fromCampId = $refugee->current_camp_id;
-            $fromShelterId = $refugee->current_shelter_id;
+            $fromCampId = (int) $refugee->current_camp_id;
+            $fromShelterId = $refugee->current_shelter_id === null ? null : (int) $refugee->current_shelter_id;
+            $shelterId = $shelterId === null ? null : (int) $shelterId;
+
+            if ($fromCampId === $campId && $fromShelterId === $shelterId) {
+                return $refugee;
+            }
 
             if ($shelterId) {
                 $shelter = Shelter::query()->lockForUpdate()->findOrFail($shelterId);
 
                 if ((int) $shelter->camp_id !== (int) $campId) {
                     throw ValidationException::withMessages([
-                        'shelter_id' => 'الوحدة السكنية لا تتبع للمخيم الهدف.',
+                        $errorKey => 'الوحدة السكنية لا تتبع للمخيم الهدف.',
+                    ]);
+                }
+
+                if ($shelter->status !== 'active') {
+                    throw ValidationException::withMessages([
+                        $errorKey => 'لا يمكن التخصيص إلى وحدة غير فعالة أو تحت الصيانة.',
                     ]);
                 }
 
                 if ($this->shelterIsFull($shelter, $refugee->id)) {
                     throw ValidationException::withMessages([
-                        'shelter_id' => 'لا يمكن تخصيص لاجئ إلى وحدة ممتلئة.',
+                        $errorKey => 'لا يمكن تخصيص لاجئ إلى وحدة ممتلئة.',
                     ]);
                 }
             }
@@ -46,9 +70,12 @@ class HousingService
                 'housing_status' => $shelterId ? 'assigned' : 'unassigned',
             ]);
 
-            $transferType = $fromCampId !== $campId
-                ? 'camp_transfer'
-                : ($shelterId ? 'shelter_transfer' : 'unassignment');
+            $transferType = match (true) {
+                $fromCampId !== $campId => 'camp_transfer',
+                $shelterId === null => 'unassignment',
+                $fromShelterId === null => 'assignment',
+                default => 'shelter_transfer',
+            };
 
             ResidencyTransfer::create([
                 'refugee_id' => $refugee->id,

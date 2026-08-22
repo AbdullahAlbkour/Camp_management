@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\HouseholdMemberRequest;
 use App\Models\Household;
 use App\Models\Refugee;
 use App\Services\AuditLogService;
@@ -93,12 +94,9 @@ class HouseholdController extends Controller
         return redirect()->route('households.show', $household)->with('success', 'تم تعديل الأسرة.');
     }
 
-    public function addMember(Request $request, Household $household, AuditLogService $auditLog): RedirectResponse
+    public function addMember(HouseholdMemberRequest $request, Household $household, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate([
-            'refugee_id' => ['required', 'exists:refugees,id'],
-            'relation_to_head' => ['required', 'string', 'max:255'],
-        ]);
+        $data = $request->validated();
 
         $refugee = Refugee::findOrFail($data['refugee_id']);
         $refugee->update([

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ShelterRequest;
 use App\Models\Camp;
 use App\Models\Shelter;
 use App\Services\AuditLogService;
@@ -40,9 +41,9 @@ class ShelterController extends Controller
         return $this->form(new Shelter, route('shelters.store'), 'POST', 'إضافة وحدة سكنية');
     }
 
-    public function store(Request $request, AuditLogService $auditLog): RedirectResponse
+    public function store(ShelterRequest $request, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate($this->rules());
+        $data = $request->validated();
         $shelter = Shelter::create($data);
         $auditLog->log('create', 'shelters', $shelter, 'إضافة وحدة سكنية', 'medium', $data);
 
@@ -54,25 +55,13 @@ class ShelterController extends Controller
         return $this->form($shelter, route('shelters.update', $shelter), 'PUT', 'تعديل وحدة سكنية');
     }
 
-    public function update(Request $request, Shelter $shelter, AuditLogService $auditLog): RedirectResponse
+    public function update(ShelterRequest $request, Shelter $shelter, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate($this->rules($shelter->id));
+        $data = $request->validated();
         $shelter->update($data);
         $auditLog->log('update', 'shelters', $shelter, 'تعديل وحدة سكنية', 'medium', $data);
 
         return redirect()->route('shelters.index')->with('success', 'تم تعديل الوحدة السكنية.');
-    }
-
-    private function rules(?int $id = null): array
-    {
-        return [
-            'camp_id' => ['required', 'exists:camps,id'],
-            'code' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'string', 'max:255'],
-            'capacity' => ['required', 'integer', 'min:1'],
-            'status' => ['required', 'in:active,maintenance,inactive'],
-            'notes' => ['nullable', 'string'],
-        ];
     }
 
     private function form(Shelter $shelter, string $action, string $method, string $title): View

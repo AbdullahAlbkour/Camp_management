@@ -367,3 +367,128 @@ document.addEventListener('DOMContentLoaded', () => {
         loadChartJs().then(bootCanvasCharts).catch(() => {});
     }
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('[data-global-search]');
+    if (!form) return;
+
+    const input = form.querySelector('input[type="search"]');
+    const panel = form.querySelector('.global-search-panel');
+    const endpoint = form.dataset.globalSearch;
+    if (!input || !panel || !endpoint) return;
+
+    let debounce = null;
+    let inflight = null;
+
+    function close() {
+        panel.hidden = true;
+        panel.innerHTML = '';
+    }
+
+    function activeLinks() {
+        return Array.from(panel.querySelectorAll('a'));
+    }
+
+    function moveSelection(step) {
+        const links = activeLinks();
+        if (links.length === 0) return;
+
+        const current = links.findIndex((link) => link.classList.contains('is-active'));
+        const next = (current + step + links.length) % links.length;
+
+        links.forEach((link, index) => link.classList.toggle('is-active', index === next));
+        links[next].scrollIntoView({ block: 'nearest' });
+    }
+
+    function render(groups) {
+        if (!groups.length) {
+            panel.innerHTML = '<p class="empty-hint">لا توجد نتائج مطابقة.</p>';
+            panel.hidden = false;
+            return;
+        }
+
+        panel.innerHTML = groups.map((group) => {
+            const items = group.items.map((item) => `
+                <a href="${item.url}">
+                    <strong>${escapeHtml(item.title)}</strong>
+                    <em>${escapeHtml(item.meta || '')}</em>
+                    <span>${escapeHtml(item.subtitle || '')}</span>
+                </a>`).join('');
+
+            return `<div class="group-label">${escapeHtml(group.label)}</div>${items}`;
+        }).join('');
+
+        panel.hidden = false;
+    }
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
+    }
+
+    function query(term) {
+        if (inflight) inflight.abort();
+        inflight = new AbortController();
+
+        fetch(`${endpoint}?q=${encodeURIComponent(term)}`, {
+            headers: { Accept: 'application/json' },
+            signal: inflight.signal,
+        })
+            .then((response) => (response.ok ? response.json() : Promise.reject(response)))
+            .then((payload) => {
+                // A slower earlier request must not overwrite what the user is now typing.
+                if (payload.term === input.value.trim()) render(payload.groups || []);
+            })
+            .catch(() => {});
+    }
+
+    input.addEventListener('input', () => {
+        const term = input.value.trim();
+        window.clearTimeout(debounce);
+
+        if (term.length < 2) {
+            close();
+            return;
+        }
+
+        debounce = window.setTimeout(() => query(term), 220);
+    });
+
+    input.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            close();
+            input.blur();
+            return;
+        }
+
+        if (panel.hidden) return;
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            moveSelection(event.key === 'ArrowDown' ? 1 : -1);
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            const active = panel.querySelector('a.is-active');
+            if (active) {
+                event.preventDefault();
+                window.location.href = active.href;
+            }
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!form.contains(event.target)) close();
+    });
+
+    // "/" focuses the search box, the way most admin consoles behave.
+    document.addEventListener('keydown', (event) => {
+        const typingInField = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+        if (event.key === '/' && !typingInField) {
+            event.preventDefault();
+            input.focus();
+        }
+    });
+});

@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
+    public const DEMO_PASSWORD = 'Camp-Demo-2026';
+
     public function run(): void
     {
         $roles = [
@@ -37,12 +39,18 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
+        // Demo accounts. The password satisfies the application's own policy, so a
+        // seeded account can immediately be edited through the admin screen without
+        // the form rejecting the password it was created with. Override it per
+        // environment with SEED_PASSWORD, and change it before any real deployment.
+        $seedPassword = Hash::make(env('SEED_PASSWORD', self::DEMO_PASSWORD));
+
         foreach ($roles as $name => $display) {
             User::updateOrCreate(
                 ['email' => str_replace('_officer', '', $name).'@camp.local'],
                 [
                     'name' => $display,
-                    'password' => Hash::make('password'),
+                    'password' => $seedPassword,
                     'role_id' => Role::where('name', $name)->value('id'),
                     'status' => 'active',
                 ]

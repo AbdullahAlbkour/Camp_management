@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Refugee extends Model
 {
+    use HasFactory;
+    use SoftDeletes;
+
     protected $fillable = [
         'first_name',
         'father_name',
@@ -35,9 +41,30 @@ class Refugee extends Model
         ];
     }
 
+    /**
+     * Father's name is optional, so the parts are joined rather than concatenated:
+     * a plain concatenation left a doubled space in the middle of every name
+     * belonging to a refugee registered without one.
+     */
     public function getFullNameAttribute(): string
     {
-        return trim($this->first_name.' '.$this->father_name.' '.$this->last_name);
+        return collect([$this->first_name, $this->father_name, $this->last_name])
+            ->map(fn (?string $part) => trim((string) $part))
+            ->filter()
+            ->implode(' ');
+    }
+
+    /**
+     * Stable, human-readable identifier printed and encoded on the refugee's badge.
+     */
+    public function getBadgeCodeAttribute(): string
+    {
+        return 'REF-'.str_pad((string) $this->id, 6, '0', STR_PAD_LEFT);
+    }
+
+    public function getAgeAttribute(): ?int
+    {
+        return $this->date_of_birth?->age;
     }
 
     public function currentCamp(): BelongsTo
@@ -78,5 +105,10 @@ class Refugee extends Model
     public function securityReports(): HasMany
     {
         return $this->hasMany(SecurityReport::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable')->latest();
     }
 }

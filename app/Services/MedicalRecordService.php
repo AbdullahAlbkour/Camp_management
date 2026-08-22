@@ -12,8 +12,7 @@ class MedicalRecordService
     public function __construct(
         private readonly AuditLogService $auditLog,
         private readonly NotificationService $notifications
-    ) {
-    }
+    ) {}
 
     public function create(array $data): MedicalRecord
     {

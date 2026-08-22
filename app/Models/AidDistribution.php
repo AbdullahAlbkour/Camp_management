@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AidDistribution extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'aid_type_id',
         'refugee_id',
@@ -44,5 +47,10 @@ class AidDistribution extends Model
     public function camp(): BelongsTo
     {
         return $this->belongsTo(Camp::class);
+    }
+
+    public function distributedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'distributed_by');
     }
 }

@@ -14,14 +14,15 @@
         <h2>سجلات مشابهة</h2>
         <div class="table-wrap embedded">
             <table>
-                <thead><tr><th>الاسم</th><th>الوثيقة</th><th>المخيم</th><th>فتح الملف</th></tr></thead>
+                <thead><tr><th>الاسم</th><th>الوثيقة</th><th>المخيم</th><th>سبب التشابه</th><th>فتح الملف</th></tr></thead>
                 <tbody>
                     @foreach (session('duplicates') as $duplicate)
                         <tr>
                             <td>{{ $duplicate->full_name }}</td>
                             <td>{{ $duplicate->document_number ?? '-' }}</td>
                             <td>{{ $duplicate->currentCamp?->name }}</td>
-                            <td><a href="{{ route('refugees.show', $duplicate) }}">عرض</a></td>
+                            <td>{{ implode('، ', $duplicate->match_reasons ?? []) }}</td>
+                            <td><a href="{{ route('refugees.show', $duplicate) }}" target="_blank">عرض</a></td>
                         </tr>
                     @endforeach
                 </tbody>

@@ -14,8 +14,7 @@ class MovementSecurityService
     public function __construct(
         private readonly AuditLogService $auditLog,
         private readonly NotificationService $notifications
-    ) {
-    }
+    ) {}
 
     public function recordMovement(array $data): EntryExitLog
     {

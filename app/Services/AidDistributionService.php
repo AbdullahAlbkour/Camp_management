@@ -14,8 +14,7 @@ class AidDistributionService
     public function __construct(
         private readonly AuditLogService $auditLog,
         private readonly NotificationService $notifications
-    ) {
-    }
+    ) {}
 
     public function distribute(array $data): AidDistribution
     {

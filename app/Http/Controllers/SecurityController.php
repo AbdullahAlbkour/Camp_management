@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CheckpointRequest;
+use App\Http\Requests\MovementRequest;
+use App\Http\Requests\SecurityReportRequest;
 use App\Models\Camp;
 use App\Models\Checkpoint;
 use App\Models\EntryExitLog;
-use App\Models\Refugee;
 use App\Models\SecurityReport;
 use App\Services\AuditLogService;
 use App\Services\MovementSecurityService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class SecurityController extends Controller
@@ -36,14 +37,9 @@ class SecurityController extends Controller
         return $this->checkpointForm(new Checkpoint, route('security.checkpoints.store'), 'POST', 'إضافة نقطة تفتيش');
     }
 
-    public function storeCheckpoint(Request $request, AuditLogService $auditLog): RedirectResponse
+    public function storeCheckpoint(CheckpointRequest $request, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate([
-            'camp_id' => ['required', 'exists:camps,id'],
-            'name' => ['required', 'string', 'max:255'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'status' => ['required', 'in:active,inactive'],
-        ]);
+        $data = $request->validated();
 
         $checkpoint = Checkpoint::create($data);
         $auditLog->log('create', 'checkpoints', $checkpoint, 'إضافة نقطة تفتيش', 'medium', $data);
@@ -56,14 +52,9 @@ class SecurityController extends Controller
         return $this->checkpointForm($checkpoint, route('security.checkpoints.update', $checkpoint), 'PUT', 'تعديل نقطة تفتيش');
     }
 
-    public function updateCheckpoint(Request $request, Checkpoint $checkpoint, AuditLogService $auditLog): RedirectResponse
+    public function updateCheckpoint(CheckpointRequest $request, Checkpoint $checkpoint, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate([
-            'camp_id' => ['required', 'exists:camps,id'],
-            'name' => ['required', 'string', 'max:255'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'status' => ['required', 'in:active,inactive'],
-        ]);
+        $data = $request->validated();
 
         $checkpoint->update($data);
         $auditLog->log('update', 'checkpoints', $checkpoint, 'تعديل نقطة تفتيش', 'medium', $data);
@@ -105,15 +96,9 @@ class SecurityController extends Controller
         ]);
     }
 
-    public function storeMovement(Request $request, MovementSecurityService $service): RedirectResponse
+    public function storeMovement(MovementRequest $request, MovementSecurityService $service): RedirectResponse
     {
-        $data = $request->validate([
-            'refugee_id' => ['required', 'exists:refugees,id'],
-            'checkpoint_id' => ['required', 'exists:checkpoints,id'],
-            'movement_type' => ['required', 'in:entry,exit'],
-            'movement_datetime' => ['required', 'date'],
-            'reason' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $service->recordMovement($data);
 
@@ -155,16 +140,9 @@ class SecurityController extends Controller
         ]);
     }
 
-    public function storeReport(Request $request, MovementSecurityService $service): RedirectResponse
+    public function storeReport(SecurityReportRequest $request, MovementSecurityService $service): RedirectResponse
     {
-        $data = $request->validate([
-            'refugee_id' => ['required', 'exists:refugees,id'],
-            'incident_type' => ['required', 'string', 'max:255'],
-            'severity' => ['required', 'in:low,medium,high,critical'],
-            'report_date' => ['required', 'date'],
-            'description' => ['required', 'string'],
-            'action_taken' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $service->createSecurityReport($data);
 

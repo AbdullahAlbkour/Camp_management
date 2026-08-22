@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EntryExitLog extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'refugee_id',
         'camp_id',
@@ -35,5 +38,10 @@ class EntryExitLog extends Model
     public function camp(): BelongsTo
     {
         return $this->belongsTo(Camp::class);
+    }
+
+    public function recordedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
     }
 }
