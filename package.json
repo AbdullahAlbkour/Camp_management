@@ -1,0 +1,7 @@
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "lint:assets": "node -e \"console.log('Plain CSS/JS project: no build step required')\""
+    }
+}

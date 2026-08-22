@@ -1,0 +1,96 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Camp;
+use App\Models\Shelter;
+use App\Services\AuditLogService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class ShelterController extends Controller
+{
+    public function index(Request $request): View
+    {
+        $rows = Shelter::with('camp')
+            ->withCount(['refugees as occupied' => fn ($query) => $query->where('status', 'active')])
+            ->when($request->camp_id, fn ($query, $campId) => $query->where('camp_id', $campId))
+            ->latest()
+            ->paginate(20);
+
+        return view('crud.index', [
+            'title' => 'الوحدات السكنية',
+            'createRoute' => route('shelters.create'),
+            'columns' => [
+                ['label' => 'الرمز', 'field' => 'code'],
+                ['label' => 'المخيم', 'field' => 'camp.name'],
+                ['label' => 'النوع', 'field' => 'type'],
+                ['label' => 'السعة', 'field' => 'capacity'],
+                ['label' => 'الإشغال', 'field' => 'occupied'],
+                ['label' => 'الحالة', 'field' => 'status'],
+            ],
+            'rows' => $rows,
+            'editRoute' => 'shelters.edit',
+        ]);
+    }
+
+    public function create(): View
+    {
+        return $this->form(new Shelter, route('shelters.store'), 'POST', 'إضافة وحدة سكنية');
+    }
+
+    public function store(Request $request, AuditLogService $auditLog): RedirectResponse
+    {
+        $data = $request->validate($this->rules());
+        $shelter = Shelter::create($data);
+        $auditLog->log('create', 'shelters', $shelter, 'إضافة وحدة سكنية', 'medium', $data);
+
+        return redirect()->route('shelters.index')->with('success', 'تم حفظ الوحدة السكنية.');
+    }
+
+    public function edit(Shelter $shelter): View
+    {
+        return $this->form($shelter, route('shelters.update', $shelter), 'PUT', 'تعديل وحدة سكنية');
+    }
+
+    public function update(Request $request, Shelter $shelter, AuditLogService $auditLog): RedirectResponse
+    {
+        $data = $request->validate($this->rules($shelter->id));
+        $shelter->update($data);
+        $auditLog->log('update', 'shelters', $shelter, 'تعديل وحدة سكنية', 'medium', $data);
+
+        return redirect()->route('shelters.index')->with('success', 'تم تعديل الوحدة السكنية.');
+    }
+
+    private function rules(?int $id = null): array
+    {
+        return [
+            'camp_id' => ['required', 'exists:camps,id'],
+            'code' => ['required', 'string', 'max:255'],
+            'type' => ['required', 'string', 'max:255'],
+            'capacity' => ['required', 'integer', 'min:1'],
+            'status' => ['required', 'in:active,maintenance,inactive'],
+            'notes' => ['nullable', 'string'],
+        ];
+    }
+
+    private function form(Shelter $shelter, string $action, string $method, string $title): View
+    {
+        return view('crud.form', [
+            'title' => $title,
+            'action' => $action,
+            'method' => $method,
+            'backRoute' => route('shelters.index'),
+            'model' => $shelter,
+            'fields' => [
+                ['name' => 'camp_id', 'label' => 'المخيم', 'type' => 'select', 'required' => true, 'options' => Camp::pluck('name', 'id')],
+                ['name' => 'code', 'label' => 'رمز الوحدة', 'type' => 'text', 'required' => true],
+                ['name' => 'type', 'label' => 'النوع', 'type' => 'select', 'required' => true, 'options' => ['tent' => 'خيمة', 'room' => 'غرفة', 'caravan' => 'كرفان']],
+                ['name' => 'capacity', 'label' => 'السعة', 'type' => 'number', 'required' => true],
+                ['name' => 'status', 'label' => 'الحالة', 'type' => 'select', 'required' => true, 'options' => ['active' => 'فعال', 'maintenance' => 'صيانة', 'inactive' => 'غير فعال']],
+                ['name' => 'notes', 'label' => 'ملاحظات', 'type' => 'textarea'],
+            ],
+        ]);
+    }
+}
