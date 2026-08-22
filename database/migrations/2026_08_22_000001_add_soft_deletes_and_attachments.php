@@ -51,6 +51,12 @@ return new class extends Migration
         Schema::dropIfExists('attachments');
 
         foreach (self::ARCHIVABLE as $table) {
+            // The index has to go first: dropSoftDeletes() only removes the column,
+            // and dropping a column an index still references fails.
+            Schema::table($table, function (Blueprint $blueprint): void {
+                $blueprint->dropIndex(['deleted_at']);
+            });
+
             Schema::table($table, function (Blueprint $blueprint): void {
                 $blueprint->dropSoftDeletes();
             });
