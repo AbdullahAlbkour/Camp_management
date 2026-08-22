@@ -49,6 +49,7 @@
                 @role('admin','security_officer')<a @class(['active' => request()->routeIs('security.checkpoints*')]) href="{{ route('security.checkpoints') }}"><i data-lucide="scan-line"></i><span>نقاط التفتيش</span></a>@endrole
                 <a @class(['active' => request()->routeIs('reports.*')]) href="{{ route('reports.index') }}"><i data-lucide="bar-chart-3"></i><span>التقارير</span></a>
                 <a @class(['active' => request()->routeIs('notifications.*')]) href="{{ route('notifications.index') }}"><i data-lucide="bell"></i><span>التنبيهات</span></a>
+                @role('admin','housing_officer','registration_officer','aid_officer')<a @class(['active' => request()->routeIs('archive.*')]) href="{{ route('archive.index') }}"><i data-lucide="archive"></i><span>الأرشيف</span></a>@endrole
                 @role('admin','manager')<a @class(['active' => request()->routeIs('audit.*')]) href="{{ route('audit.index') }}"><i data-lucide="history"></i><span>سجل التدقيق</span></a>@endrole
             </nav>
 

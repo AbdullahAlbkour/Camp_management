@@ -52,12 +52,12 @@
     <article class="panel">
         <h2>البيانات الأساسية</h2>
         <dl>
-            <dt>الجنس</dt><dd>{{ $refugee->gender }}</dd>
+            <dt>الجنس</dt><dd>{{ \App\Support\Labels::get('gender', $refugee->gender) }}</dd>
             <dt>تاريخ الميلاد</dt><dd>{{ optional($refugee->date_of_birth)->format('Y-m-d') ?? '-' }}</dd>
             <dt>الجنسية</dt><dd>{{ $refugee->nationality ?? '-' }}</dd>
             <dt>الهاتف</dt><dd>{{ $refugee->phone ?? '-' }}</dd>
-            <dt>الحالة</dt><dd>{{ $refugee->status }}</dd>
-            <dt>الوجود</dt><dd>{{ $refugee->presence_status }}</dd>
+            <dt>الحالة</dt><dd>{{ \App\Support\Labels::get('refugee_status', $refugee->status) }}</dd>
+            <dt>الوجود</dt><dd>{{ \App\Support\Labels::get('presence_status', $refugee->presence_status) }}</dd>
         </dl>
     </article>
 
@@ -67,11 +67,70 @@
             <dt>المخيم</dt><dd>{{ $refugee->currentCamp?->name }}</dd>
             <dt>الوحدة</dt><dd>{{ $refugee->currentShelter?->display_name ?? 'بدون سكن' }}</dd>
             <dt>نوع السكن</dt><dd>{{ $refugee->currentShelter?->type_label ?? '-' }}</dd>
-            <dt>حالة السكن</dt><dd>{{ $refugee->housing_status }}</dd>
+            <dt>حالة السكن</dt><dd>{{ \App\Support\Labels::get('housing_status', $refugee->housing_status) }}</dd>
             <dt>الأسرة</dt><dd>{{ $refugee->household?->household_code ?? '-' }}</dd>
             <dt>صلة القرابة</dt><dd>{{ $refugee->relation_to_head ?? '-' }}</dd>
         </dl>
     </article>
+</section>
+
+<section class="panel attachments-panel">
+    <h2>المرفقات</h2>
+
+    @php
+        $visibleAttachments = $refugee->attachments->filter(
+            fn ($attachment) => $attachment->category !== 'medical'
+                || auth()->user()?->hasAnyRole(['admin', 'medical_officer'])
+        );
+    @endphp
+
+    @if ($visibleAttachments->isEmpty())
+        <p class="muted">لا توجد ملفات مرفقة بهذا السجل.</p>
+    @else
+        <ul class="attachment-list">
+            @foreach ($visibleAttachments as $attachment)
+                <li>
+                    <i data-lucide="{{ $attachment->isImage() ? 'image' : 'file-text' }}"></i>
+                    <div>
+                        <a href="{{ route('attachments.download', $attachment) }}">{{ $attachment->original_name }}</a>
+                        <small>{{ $attachment->category_label }} • {{ $attachment->human_size }} • {{ $attachment->created_at?->format('Y-m-d') }}</small>
+                        @if ($attachment->description)<small>{{ $attachment->description }}</small>@endif
+                    </div>
+                    @role('admin','registration_officer','medical_officer')
+                        <form method="post" action="{{ route('attachments.destroy', $attachment) }}"
+                              onsubmit="return confirm('حذف المرفق {{ $attachment->original_name }}؟');">
+                            @csrf
+                            @method('DELETE')
+                            <button class="icon-button" type="submit" title="حذف"><i data-lucide="trash-2"></i></button>
+                        </form>
+                    @endrole
+                </li>
+            @endforeach
+        </ul>
+    @endif
+
+    @role('admin','registration_officer','medical_officer')
+        <form method="post" action="{{ route('refugees.attachments.store', $refugee) }}"
+              enctype="multipart/form-data" class="attachment-form">
+            @csrf
+            <label>الملف
+                <input type="file" name="file" required
+                       accept=".pdf,.jpg,.jpeg,.png,.webp">
+            </label>
+            <label>التصنيف
+                <select name="category" required>
+                    @foreach (\App\Services\AttachmentService::CATEGORIES as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label>وصف مختصر
+                <input type="text" name="description" maxlength="255" placeholder="اختياري">
+            </label>
+            <button class="primary" type="submit"><i data-lucide="upload"></i><span>إرفاق</span></button>
+        </form>
+        <p class="muted small">الصيغ المقبولة: PDF، JPG، PNG، WEBP — بحد أقصى 8 ميجابايت.</p>
+    @endrole
 </section>
 
 @include('refugees.timeline', ['title' => 'تاريخ الانتقالات', 'rows' => $refugee->residencyTransfers, 'fields' => ['transfer_type', 'from_camp_id', 'to_camp_id', 'from_shelter_id', 'to_shelter_id', 'transferred_at']])

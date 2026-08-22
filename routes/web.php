@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AidController;
+use App\Http\Controllers\ArchiveController;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CampController;
@@ -59,6 +61,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/refugees', [RefugeeController::class, 'store'])->name('refugees.store')->middleware('role:admin,registration_officer');
     Route::get('/refugees/{refugee}', [RefugeeController::class, 'show'])->name('refugees.show');
     Route::get('/refugees/{refugee}/card', RefugeeCardController::class)->name('refugees.card');
+    Route::post('/refugees/{refugee}/attachments', [AttachmentController::class, 'store'])->name('refugees.attachments.store')->middleware('role:admin,registration_officer,medical_officer');
     Route::get('/refugees/{refugee}/edit', [RefugeeController::class, 'edit'])->name('refugees.edit')->middleware('role:admin,registration_officer');
     Route::put('/refugees/{refugee}', [RefugeeController::class, 'update'])->name('refugees.update')->middleware('role:admin,registration_officer');
 
@@ -130,6 +133,14 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/{notification}/resolve', [NotificationController::class, 'resolve'])->name('notifications.resolve');
+
+    Route::get('/attachments/{attachment}', [AttachmentController::class, 'download'])->name('attachments.download');
+    Route::delete('/attachments/{attachment}', [AttachmentController::class, 'destroy'])->name('attachments.destroy')->middleware('role:admin,registration_officer,medical_officer');
+
+    // Archiving is a soft delete: rows stay so historical records keep resolving.
+    Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
+    Route::delete('/archive/{resource}/{id}', [ArchiveController::class, 'archive'])->whereNumber('id')->name('archive.store');
+    Route::post('/archive/{resource}/{id}/restore', [ArchiveController::class, 'restore'])->whereNumber('id')->name('archive.restore');
 
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit.index')->middleware('role:admin,manager');
 });

@@ -82,6 +82,7 @@ class RefugeeController extends Controller
             'medicalRecords.medicalService',
             'entryExitLogs.checkpoint',
             'securityReports',
+            'attachments.uploadedBy',
         ]);
 
         return view('refugees.show', [

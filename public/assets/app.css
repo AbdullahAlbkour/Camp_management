@@ -2375,3 +2375,33 @@ label {
     .global-search { min-width: 0; flex: 1; }
     .global-search input[type="search"]::placeholder { font-size: 0.8rem; }
 }
+
+/* ---- Attachments on a record profile ---- */
+.attachment-list { list-style: none; margin: 0.5rem 0 1rem; padding: 0; display: grid; gap: 0.4rem; }
+
+.attachment-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.7rem;
+}
+
+.attachment-list li > i { width: 20px; height: 20px; opacity: 0.6; flex: none; }
+.attachment-list li > div { flex: 1; min-width: 0; display: grid; gap: 0.1rem; }
+.attachment-list li a { font-weight: 600; text-decoration: none; color: inherit; word-break: break-word; }
+.attachment-list li a:hover { text-decoration: underline; }
+.attachment-list li small { font-size: 0.76rem; opacity: 0.62; }
+
+.attachment-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+    padding-top: 0.75rem;
+    border-top: 1px dashed rgba(0, 0, 0, 0.12);
+}
+
+.attachment-form label { display: grid; gap: 0.3rem; font-size: 0.83rem; }
+.attachment-form input, .attachment-form select { font: inherit; padding: 0.5rem; border-radius: 0.6rem; border: 1px solid rgba(0, 0, 0, 0.14); }

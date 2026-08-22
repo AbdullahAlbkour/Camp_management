@@ -6,10 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Refugee extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     protected $fillable = [
         'first_name',
@@ -102,5 +105,10 @@ class Refugee extends Model
     public function securityReports(): HasMany
     {
         return $this->hasMany(SecurityReport::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable')->latest();
     }
 }
