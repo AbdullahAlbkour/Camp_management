@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\HousingTransferRequest;
 use App\Models\Camp;
 use App\Models\Household;
 use App\Models\Refugee;
 use App\Models\Shelter;
 use App\Services\HousingService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class HousingController extends Controller
@@ -33,26 +33,18 @@ class HousingController extends Controller
         ]);
     }
 
-    public function transfer(Request $request, Refugee $refugee, HousingService $housing): RedirectResponse
+    public function transfer(HousingTransferRequest $request, Refugee $refugee, HousingService $housing): RedirectResponse
     {
-        $data = $request->validate([
-            'camp_id' => ['required', 'exists:camps,id'],
-            'shelter_id' => ['nullable', 'exists:shelters,id'],
-            'reason' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $housing->transferRefugee($refugee, (int) $data['camp_id'], $data['shelter_id'] ? (int) $data['shelter_id'] : null, $data['reason'] ?? null);
 
         return redirect()->route('refugees.show', $refugee)->with('success', 'تم تنفيذ عملية السكن أو الانتقال.');
     }
 
-    public function householdTransfer(Request $request, Household $household, HousingService $housing): RedirectResponse
+    public function householdTransfer(HousingTransferRequest $request, Household $household, HousingService $housing): RedirectResponse
     {
-        $data = $request->validate([
-            'camp_id' => ['required', 'exists:camps,id'],
-            'shelter_id' => ['nullable', 'exists:shelters,id'],
-            'reason' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $housing->transferHousehold($household, (int) $data['camp_id'], $data['shelter_id'] ? (int) $data['shelter_id'] : null, $data['reason'] ?? null);
 

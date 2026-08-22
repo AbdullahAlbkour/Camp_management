@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CampRequest;
 use App\Models\Camp;
 use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CampController extends Controller
@@ -35,9 +35,9 @@ class CampController extends Controller
         return $this->form(new Camp, route('camps.store'), 'POST', 'إضافة مخيم');
     }
 
-    public function store(Request $request, AuditLogService $auditLog): RedirectResponse
+    public function store(CampRequest $request, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate($this->rules());
+        $data = $request->validated();
         $camp = Camp::create($data);
         $auditLog->log('create', 'camps', $camp, 'إضافة مخيم', 'medium', $data);
 
@@ -49,24 +49,13 @@ class CampController extends Controller
         return $this->form($camp, route('camps.update', $camp), 'PUT', 'تعديل مخيم');
     }
 
-    public function update(Request $request, Camp $camp, AuditLogService $auditLog): RedirectResponse
+    public function update(CampRequest $request, Camp $camp, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate($this->rules($camp->id));
+        $data = $request->validated();
         $camp->update($data);
         $auditLog->log('update', 'camps', $camp, 'تعديل مخيم', 'medium', $data);
 
         return redirect()->route('camps.index')->with('success', 'تم تعديل المخيم.');
-    }
-
-    private function rules(?int $id = null): array
-    {
-        return [
-            'name' => ['required', 'string', 'max:255', 'unique:camps,name'.($id ? ','.$id : '')],
-            'location' => ['nullable', 'string', 'max:255'],
-            'capacity' => ['required', 'integer', 'min:0'],
-            'status' => ['required', 'in:active,inactive'],
-            'notes' => ['nullable', 'string'],
-        ];
     }
 
     private function form(Camp $camp, string $action, string $method, string $title): View

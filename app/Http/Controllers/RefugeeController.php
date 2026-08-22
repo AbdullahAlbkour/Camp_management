@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RefugeeRequest;
 use App\Models\Camp;
 use App\Models\Household;
 use App\Models\Refugee;
@@ -54,9 +55,9 @@ class RefugeeController extends Controller
         ]);
     }
 
-    public function store(Request $request, RefugeeRegistrationService $service): RedirectResponse
+    public function store(RefugeeRequest $request, RefugeeRegistrationService $service): RedirectResponse
     {
-        $data = $request->validate($this->rules());
+        $data = $request->validated();
         $duplicates = $service->possibleDuplicates($data);
 
         if ($duplicates->isNotEmpty() && ! $request->boolean('confirmed_duplicate_check')) {
@@ -105,12 +106,12 @@ class RefugeeController extends Controller
     }
 
     public function update(
-        Request $request,
+        RefugeeRequest $request,
         Refugee $refugee,
         AuditLogService $auditLog,
         HousingService $housing
     ): RedirectResponse {
-        $data = $request->validate($this->rules($refugee->id));
+        $data = $request->validated();
 
         // Housing is never written straight to the row: it goes through HousingService so
         // capacity is enforced and a residency_transfers entry is recorded for the move.
@@ -133,27 +134,5 @@ class RefugeeController extends Controller
         });
 
         return redirect()->route('refugees.show', $refugee)->with('success', 'تم تعديل بيانات اللاجئ.');
-    }
-
-    private function rules(?int $id = null): array
-    {
-        return [
-            'first_name' => ['required', 'string', 'max:255'],
-            'father_name' => ['nullable', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'gender' => ['required', 'in:male,female,other'],
-            'date_of_birth' => ['nullable', 'date'],
-            'nationality' => ['nullable', 'string', 'max:255'],
-            'document_number' => ['nullable', 'string', 'max:255', 'unique:refugees,document_number'.($id ? ','.$id : '')],
-            'phone' => ['nullable', 'string', 'max:255'],
-            'marital_status' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'in:active,inactive,archived'],
-            'current_camp_id' => ['required', 'exists:camps,id'],
-            'current_shelter_id' => ['nullable', 'exists:shelters,id'],
-            'presence_status' => ['nullable', 'in:inside,outside'],
-            'household_id' => ['nullable', 'exists:households,id'],
-            'relation_to_head' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string'],
-        ];
     }
 }

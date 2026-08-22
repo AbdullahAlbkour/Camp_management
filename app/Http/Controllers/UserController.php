@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UserRequest;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class UserController extends Controller
@@ -34,9 +34,9 @@ class UserController extends Controller
         return $this->form(new User, route('users.store'), 'POST', 'إضافة مستخدم');
     }
 
-    public function store(Request $request, AuditLogService $auditLog): RedirectResponse
+    public function store(UserRequest $request, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate($this->rules());
+        $data = $request->payload();
         $user = User::create($data);
         $auditLog->log('create', 'users', $user, 'إضافة مستخدم جديد', 'critical', $data);
 
@@ -48,31 +48,13 @@ class UserController extends Controller
         return $this->form($user, route('users.update', $user), 'PUT', 'تعديل مستخدم');
     }
 
-    public function update(Request $request, User $user, AuditLogService $auditLog): RedirectResponse
+    public function update(UserRequest $request, User $user, AuditLogService $auditLog): RedirectResponse
     {
-        $rules = $this->rules($user->id);
-        $rules['password'] = ['nullable', 'string', 'min:8'];
-        $data = $request->validate($rules);
-
-        if (empty($data['password'])) {
-            unset($data['password']);
-        }
-
+        $data = $request->payload();
         $user->update($data);
         $auditLog->log('update', 'users', $user, 'تعديل بيانات مستخدم', 'critical', $data);
 
         return redirect()->route('users.index')->with('success', 'تم تعديل المستخدم بنجاح.');
-    }
-
-    private function rules(?int $userId = null): array
-    {
-        return [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'.($userId ? ','.$userId : '')],
-            'password' => [$userId ? 'nullable' : 'required', 'string', 'min:8'],
-            'role_id' => ['required', 'exists:roles,id'],
-            'status' => ['required', 'in:active,inactive'],
-        ];
     }
 
     private function form(User $user, string $action, string $method, string $title): View

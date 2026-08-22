@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\MedicalRecordRequest;
+use App\Http\Requests\MedicalServiceRequest;
 use App\Models\MedicalRecord;
 use App\Models\MedicalService;
 use App\Services\AuditLogService;
 use App\Services\MedicalRecordService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class MedicalController extends Controller
@@ -31,13 +32,9 @@ class MedicalController extends Controller
         return $this->serviceForm(new MedicalService, route('medical.services.store'), 'POST', 'إضافة خدمة طبية');
     }
 
-    public function storeService(Request $request, AuditLogService $auditLog): RedirectResponse
+    public function storeService(MedicalServiceRequest $request, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:medical_services,name'],
-            'description' => ['nullable', 'string'],
-            'status' => ['required', 'in:active,inactive'],
-        ]);
+        $data = $request->validated();
 
         $service = MedicalService::create($data);
         $auditLog->log('create', 'medical_services', $service, 'إضافة خدمة طبية', 'medium', $data);
@@ -50,13 +47,9 @@ class MedicalController extends Controller
         return $this->serviceForm($medicalService, route('medical.services.update', $medicalService), 'PUT', 'تعديل خدمة طبية');
     }
 
-    public function updateService(Request $request, MedicalService $medicalService, AuditLogService $auditLog): RedirectResponse
+    public function updateService(MedicalServiceRequest $request, MedicalService $medicalService, AuditLogService $auditLog): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:medical_services,name,'.$medicalService->id],
-            'description' => ['nullable', 'string'],
-            'status' => ['required', 'in:active,inactive'],
-        ]);
+        $data = $request->validated();
 
         $medicalService->update($data);
         $auditLog->log('update', 'medical_services', $medicalService, 'تعديل خدمة طبية', 'medium', $data);
@@ -86,9 +79,9 @@ class MedicalController extends Controller
         return $this->recordForm(new MedicalRecord, route('medical.records.store'), 'POST', 'إضافة سجل طبي');
     }
 
-    public function storeRecord(Request $request, MedicalRecordService $service): RedirectResponse
+    public function storeRecord(MedicalRecordRequest $request, MedicalRecordService $service): RedirectResponse
     {
-        $data = $request->validate($this->recordRules());
+        $data = $request->validated();
         $service->create($data);
 
         return redirect()->route('medical.records')->with('success', 'تم حفظ السجل الطبي.');
@@ -99,9 +92,9 @@ class MedicalController extends Controller
         return $this->recordForm($medicalRecord, route('medical.records.update', $medicalRecord), 'PUT', 'تعديل سجل طبي');
     }
 
-    public function updateRecord(Request $request, MedicalRecord $medicalRecord, MedicalRecordService $service): RedirectResponse
+    public function updateRecord(MedicalRecordRequest $request, MedicalRecord $medicalRecord, MedicalRecordService $service): RedirectResponse
     {
-        $data = $request->validate($this->recordRules(false));
+        $data = $request->validated();
         $service->update($medicalRecord, $data);
 
         return redirect()->route('medical.records')->with('success', 'تم تعديل السجل الطبي.');
@@ -141,18 +134,5 @@ class MedicalController extends Controller
                 ['name' => 'follow_up_date', 'label' => 'تاريخ المتابعة', 'type' => 'date'],
             ],
         ]);
-    }
-
-    private function recordRules(bool $requireRefugee = true): array
-    {
-        return [
-            'refugee_id' => [$requireRefugee ? 'required' : 'required', 'exists:refugees,id'],
-            'medical_service_id' => ['required', 'exists:medical_services,id'],
-            'record_date' => ['required', 'date'],
-            'diagnosis' => ['required', 'string'],
-            'notes' => ['nullable', 'string'],
-            'needs_follow_up' => ['nullable', 'boolean'],
-            'follow_up_date' => ['nullable', 'date'],
-        ];
     }
 }
