@@ -48,6 +48,20 @@ class DashboardController extends Controller
         ]);
     }
 
+    /**
+     * A driver-portable "YYYY-MM" expression: DATE_FORMAT is MySQL-only, which made
+     * the dashboard fail outright on any other connection (including the test one).
+     */
+    private function monthExpression(string $column): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'sqlite' => "strftime('%Y-%m', {$column})",
+            'pgsql' => "to_char({$column}, 'YYYY-MM')",
+            'sqlsrv' => "format({$column}, 'yyyy-MM')",
+            default => "DATE_FORMAT({$column}, '%Y-%m')",
+        };
+    }
+
     private function dashboardData(): array
     {
         $user = auth()->user();
@@ -111,7 +125,7 @@ class DashboardController extends Controller
                 ->groupBy('severity')
                 ->get(),
             'medicalByMonth' => MedicalRecord::query()
-                ->select(DB::raw("DATE_FORMAT(record_date, '%Y-%m') as name"), DB::raw('count(*) as total'))
+                ->select(DB::raw($this->monthExpression('record_date').' as name'), DB::raw('count(*) as total'))
                 ->where('record_date', '>=', now()->subMonths(6)->startOfMonth())
                 ->groupBy('name')
                 ->orderBy('name')
