@@ -35,4 +35,9 @@ class SecurityReport extends Model
     {
         return $this->belongsTo(Camp::class);
     }
+
+    public function reportedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reported_by');
+    }
 }

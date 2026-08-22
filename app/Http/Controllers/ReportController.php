@@ -2,130 +2,108 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AidDistribution;
 use App\Models\Camp;
-use App\Models\EntryExitLog;
-use App\Models\Household;
-use App\Models\MedicalRecord;
-use App\Models\Refugee;
-use App\Models\ResidencyTransfer;
-use App\Models\SecurityReport;
-use App\Models\Shelter;
+use App\Reports\ReportDefinition;
+use App\Reports\ReportExporter;
+use App\Reports\ReportRegistry;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Illuminate\Support\Collection;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class ReportController extends Controller
 {
+    public function __construct(
+        private readonly ReportRegistry $registry,
+        private readonly ReportExporter $exporter,
+        private readonly AuditLogService $auditLog,
+    ) {}
+
     public function index(Request $request): View
     {
+        $report = $this->resolve($request);
+
         return view('reports.index', [
-            'report' => $request->get('report', 'refugees'),
-            'camps' => Camp::pluck('name', 'id'),
-            'rows' => $this->dataset($request)->paginate(25)->withQueryString(),
+            'report' => $report,
+            'available' => $this->registry->availableFor($request->user()),
+            'camps' => Camp::orderBy('name')->pluck('name', 'id'),
+            'rows' => $report->query->paginate(25)->withQueryString(),
+            'filters' => $this->filters($request),
         ]);
     }
 
-    public function export(Request $request, AuditLogService $auditLog): Response
+    public function export(Request $request): Response
     {
-        $rows = $this->dataset($request)->limit(5000)->get();
-        $report = $request->get('report', 'refugees');
-        $csv = $this->toCsv($rows);
+        $report = $this->resolve($request);
+        $format = $request->get('format') === 'csv' ? 'csv' : 'xlsx';
 
-        $auditLog->log('export', 'reports', null, 'تصدير تقرير '.$report, 'high', $request->all());
+        // Exporting lifts protected personal data out of the system, so it is always
+        // recorded, including which filters decided who ended up in the file.
+        $this->auditLog->log(
+            'export',
+            'reports',
+            null,
+            'تصدير تقرير '.$report->label.' بصيغة '.strtoupper($format),
+            'high',
+            $this->filters($request) + ['format' => $format]
+        );
 
-        return response($csv, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="'.$report.'_report.csv"',
-        ]);
+        return $format === 'csv'
+            ? $this->exporter->csv($report)
+            : $this->exporter->xlsx($report);
     }
 
-    public function printable(Request $request, AuditLogService $auditLog): View
+    public function printable(Request $request): View
     {
-        $report = $request->get('report', 'refugees');
-        $rows = $this->dataset($request)->limit(1000)->get();
+        $report = $this->resolve($request);
 
-        $auditLog->log('print', 'reports', null, 'طباعة تقرير '.$report, 'high', $request->all());
+        $this->auditLog->log(
+            'print',
+            'reports',
+            null,
+            'طباعة تقرير '.$report->label,
+            'high',
+            $this->filters($request)
+        );
 
         return view('reports.print', [
             'report' => $report,
-            'rows' => $rows,
-            'filters' => $request->only(['camp_id', 'from', 'to']),
+            'rows' => $report->query->limit(2000)->get(),
+            'filters' => $this->filters($request),
+            'camps' => Camp::pluck('name', 'id'),
         ]);
     }
 
-    private function dataset(Request $request)
+    /**
+     * Build the requested report, refusing keys the signed-in user may not run.
+     */
+    private function resolve(Request $request): ReportDefinition
     {
-        $report = $request->get('report', 'refugees');
-        $campId = $request->get('camp_id');
-        $from = $request->get('from');
-        $to = $request->get('to');
-        $this->authorizeReport($report);
+        $user = $request->user();
+        $key = (string) $request->get('report', ReportRegistry::DEFAULT_REPORT);
 
-        return match ($report) {
-            'households' => Household::query()->with('head')->withCount('members'),
-            'shelters' => Shelter::query()->with('camp')->withCount('refugees')->when($campId, fn ($q) => $q->where('camp_id', $campId)),
-            'transfers' => ResidencyTransfer::query()->with('refugee')->when($from, fn ($q) => $q->whereDate('transferred_at', '>=', $from))->when($to, fn ($q) => $q->whereDate('transferred_at', '<=', $to)),
-            'aid' => AidDistribution::query()->with(['aidType', 'refugee', 'household', 'camp'])->when($campId, fn ($q) => $q->where('camp_id', $campId))->when($from, fn ($q) => $q->whereDate('distribution_date', '>=', $from))->when($to, fn ($q) => $q->whereDate('distribution_date', '<=', $to)),
-            'medical' => $this->medicalReportQuery($campId, $from, $to),
-            'movement' => EntryExitLog::query()->with(['refugee', 'camp', 'checkpoint'])->when($campId, fn ($q) => $q->where('camp_id', $campId))->when($from, fn ($q) => $q->whereDate('movement_datetime', '>=', $from))->when($to, fn ($q) => $q->whereDate('movement_datetime', '<=', $to)),
-            'security' => SecurityReport::query()->with(['refugee', 'camp'])->when($campId, fn ($q) => $q->where('camp_id', $campId))->when($from, fn ($q) => $q->whereDate('report_date', '>=', $from))->when($to, fn ($q) => $q->whereDate('report_date', '<=', $to)),
-            default => Refugee::query()->with(['currentCamp', 'currentShelter', 'household'])->when($campId, fn ($q) => $q->where('current_camp_id', $campId)),
-        };
-    }
-
-    private function authorizeReport(string $report): void
-    {
-        $user = auth()->user();
-
-        $roles = [
-            'medical' => ['admin', 'medical_officer', 'manager'],
-            'security' => ['admin', 'security_officer', 'manager'],
-            'aid' => ['admin', 'aid_officer', 'manager'],
-            'shelters' => ['admin', 'housing_officer', 'manager'],
-            'transfers' => ['admin', 'housing_officer', 'manager'],
-            'movement' => ['admin', 'security_officer', 'manager'],
-        ];
-
-        if (isset($roles[$report]) && ! $user->hasAnyRole($roles[$report])) {
+        if (! array_key_exists($key, $this->registry->availableFor($user))) {
             abort(403, 'لا تملك صلاحية هذا التقرير.');
         }
+
+        return $this->registry->build($key, $this->filters($request), $user);
     }
 
-    private function medicalReportQuery(?string $campId, ?string $from, ?string $to)
+    /**
+     * @return array{camp_id: string|null, from: string|null, to: string|null}
+     */
+    private function filters(Request $request): array
     {
-        $query = MedicalRecord::query()
-            ->with(['refugee', 'medicalService', 'camp'])
-            ->when($campId, fn ($q) => $q->where('camp_id', $campId))
-            ->when($from, fn ($q) => $q->whereDate('record_date', '>=', $from))
-            ->when($to, fn ($q) => $q->whereDate('record_date', '<=', $to));
+        $validated = $request->validate([
+            'camp_id' => ['nullable', 'integer', 'exists:camps,id'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
 
-        if (auth()->user()->hasRole('manager') && ! auth()->user()->hasAnyRole(['admin', 'medical_officer'])) {
-            $query->select(['id', 'refugee_id', 'medical_service_id', 'camp_id', 'record_date', 'needs_follow_up', 'follow_up_date']);
-        }
-
-        return $query;
-    }
-
-    private function toCsv(Collection $rows): string
-    {
-        if ($rows->isEmpty()) {
-            return "\xEF\xBB\xBFلا توجد بيانات\n";
-        }
-
-        $data = $rows->map(fn ($row) => collect($row->toArray())->except(['created_at', 'updated_at'])->flatten()->all());
-        $max = $data->map(fn ($row) => count($row))->max();
-        $headers = collect(range(1, $max))->map(fn ($i) => 'حقل '.$i)->all();
-        $lines = ["\xEF\xBB\xBF".implode(',', $headers)];
-
-        foreach ($data as $row) {
-            $lines[] = collect($row)
-                ->map(fn ($value) => '"'.str_replace('"', '""', (string) $value).'"')
-                ->implode(',');
-        }
-
-        return implode("\n", $lines);
+        return [
+            'camp_id' => $validated['camp_id'] ?? null,
+            'from' => $validated['from'] ?? null,
+            'to' => $validated['to'] ?? null,
+        ];
     }
 }

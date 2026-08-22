@@ -115,9 +115,11 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/reports', [SecurityController::class, 'storeReport'])->name('reports.store');
     });
 
-    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index')->middleware('role:admin,manager,registration_officer,housing_officer,aid_officer,medical_officer,security_officer');
-    Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export')->middleware('role:admin,manager,registration_officer,housing_officer,aid_officer,medical_officer,security_officer');
-    Route::get('/reports/print', [ReportController::class, 'printable'])->name('reports.print')->middleware('role:admin,manager,registration_officer,housing_officer,aid_officer,medical_officer,security_officer');
+    // Per-report authorization lives in ReportRegistry, which also decides which
+    // reports appear in the picker, so the routes only require a signed-in user.
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
+    Route::get('/reports/print', [ReportController::class, 'printable'])->name('reports.print');
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');

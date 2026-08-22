@@ -31,4 +31,29 @@ class ResidencyTransfer extends Model
     {
         return $this->belongsTo(Refugee::class);
     }
+
+    public function fromCamp(): BelongsTo
+    {
+        return $this->belongsTo(Camp::class, 'from_camp_id');
+    }
+
+    public function toCamp(): BelongsTo
+    {
+        return $this->belongsTo(Camp::class, 'to_camp_id');
+    }
+
+    public function fromShelter(): BelongsTo
+    {
+        return $this->belongsTo(Shelter::class, 'from_shelter_id');
+    }
+
+    public function toShelter(): BelongsTo
+    {
+        return $this->belongsTo(Shelter::class, 'to_shelter_id');
+    }
+
+    public function transferredBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'transferred_by');
+    }
 }

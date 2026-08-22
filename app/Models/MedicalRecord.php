@@ -45,4 +45,9 @@ class MedicalRecord extends Model
     {
         return $this->belongsTo(Camp::class);
     }
+
+    public function recordedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
+    }
 }

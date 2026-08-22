@@ -48,4 +48,9 @@ class AidDistribution extends Model
     {
         return $this->belongsTo(Camp::class);
     }
+
+    public function distributedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'distributed_by');
+    }
 }
