@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ArabicText;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,6 +34,25 @@ class Refugee extends Model
         'relation_to_head',
         'notes',
     ];
+
+    /**
+     * Keep the folded search blob in step with the fields it is built from.
+     * Doing this on the model rather than in the controller means it stays
+     * correct no matter which path writes the record — form, service, seeder
+     * or test factory.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $refugee): void {
+            $refugee->search_text = ArabicText::searchable([
+                $refugee->first_name,
+                $refugee->father_name,
+                $refugee->last_name,
+                $refugee->document_number,
+                $refugee->phone,
+            ]);
+        });
+    }
 
     protected function casts(): array
     {

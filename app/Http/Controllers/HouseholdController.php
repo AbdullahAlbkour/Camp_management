@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Filters\HouseholdFilter;
 use App\Http\Requests\HouseholdMemberRequest;
 use App\Models\Household;
 use App\Models\Refugee;
@@ -12,27 +13,17 @@ use Illuminate\View\View;
 
 class HouseholdController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, HouseholdFilter $filter): View
     {
-        $rows = Household::with('head')
-            ->withCount('members')
-            ->when($request->q, function ($query, string $q): void {
-                $query->where(function ($inner) use ($q): void {
-                    $inner->where('household_code', 'like', '%'.$q.'%')
-                        ->orWhereHas('head', function ($headQuery) use ($q): void {
-                            $headQuery->where('first_name', 'like', '%'.$q.'%')
-                                ->orWhere('father_name', 'like', '%'.$q.'%')
-                                ->orWhere('last_name', 'like', '%'.$q.'%')
-                                ->orWhere('document_number', 'like', '%'.$q.'%');
-                        });
-                });
-            })
-            ->when($request->status, fn ($query, $status) => $query->where('status', $status))
-            ->latest()
-            ->paginate(20)
-            ->withQueryString();
+        $rows = $filter->paginate(
+            Household::query()->with('head.currentCamp')->withCount('members'),
+            $request
+        );
 
-        return view('households.index', compact('rows'));
+        return view('households.index', [
+            'rows' => $rows,
+            'filter' => $filter,
+        ]);
     }
 
     public function create(): View

@@ -2405,3 +2405,144 @@ label {
 
 .attachment-form label { display: grid; gap: 0.3rem; font-size: 0.83rem; }
 .attachment-form input, .attachment-form select { font: inherit; padding: 0.5rem; border-radius: 0.6rem; border: 1px solid rgba(0, 0, 0, 0.14); }
+
+/* ---- Advanced filter bar on the list screens ---- */
+.filter-bar { display: grid; gap: 0.85rem; }
+
+.filter-primary,
+.filter-advanced {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.7rem;
+}
+
+.filter-advanced {
+    padding-top: 0.85rem;
+    border-top: 1px dashed rgba(15, 23, 42, 0.14);
+}
+
+.filter-advanced[hidden] { display: none; }
+
+.filter-field {
+    display: grid;
+    gap: 0.28rem;
+    font-size: 0.8rem;
+    min-width: 150px;
+    flex: 1 1 150px;
+}
+
+.filter-field.wide { flex: 3 1 280px; }
+.filter-field.narrow { flex: 0 0 118px; min-width: 118px; }
+.filter-field > span { opacity: 0.7; font-weight: 500; }
+
+.filter-field input,
+.filter-field select {
+    font: inherit;
+    font-size: 0.88rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.7rem;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    background: #fff;
+    width: 100%;
+}
+
+.filter-field input:focus,
+.filter-field select:focus {
+    outline: 2px solid rgba(31, 111, 92, 0.35);
+    outline-offset: 1px;
+}
+
+.filter-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.7rem;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    background: #fff;
+    font-size: 0.88rem;
+}
+
+.filter-toggle { position: relative; }
+
+.filter-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #b4471f;
+    display: inline-block;
+    margin-inline-start: 0.15rem;
+}
+
+/* ---- Applied-filter chips ---- */
+.filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.85rem 0 0.35rem;
+    font-size: 0.82rem;
+}
+
+.filter-chips-label { opacity: 0.6; }
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(31, 111, 92, 0.1);
+    border: 1px solid rgba(31, 111, 92, 0.22);
+    color: inherit;
+    text-decoration: none;
+}
+
+.filter-chip:hover { background: rgba(180, 71, 31, 0.12); border-color: rgba(180, 71, 31, 0.3); }
+.filter-chip i { width: 13px; height: 13px; opacity: 0.65; }
+.filter-chips-count { margin-inline-start: auto; opacity: 0.65; font-weight: 600; }
+
+/* ---- Sortable table headings ---- */
+th.sortable { padding: 0; }
+
+th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.75rem 0.9rem;
+    color: inherit;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+th.sortable i { width: 13px; height: 13px; opacity: 0.35; }
+th.sortable.is-sorted { background: rgba(31, 111, 92, 0.1); }
+th.sortable.is-sorted i { opacity: 0.9; }
+th.sortable a:hover { background: rgba(15, 23, 42, 0.04); }
+
+/* ---- Row helpers ---- */
+.row-link { font-weight: 600; color: inherit; text-decoration: none; }
+.row-link:hover { text-decoration: underline; }
+.row-sub { display: block; font-size: 0.72rem; opacity: 0.55; font-family: ui-monospace, monospace; }
+
+/* ---- Shelter occupancy meter ---- */
+.occupancy { display: flex; align-items: center; gap: 0.5rem; }
+
+.occupancy-bar {
+    flex: 1;
+    min-width: 54px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.1);
+    overflow: hidden;
+}
+
+.occupancy-bar > span { display: block; height: 100%; background: #1f6f5c; border-radius: 999px; }
+.occupancy-text { font-size: 0.78rem; font-variant-numeric: tabular-nums; opacity: 0.8; }
+
+@media (max-width: 720px) {
+    .filter-field, .filter-field.wide { flex: 1 1 100%; }
+    .filter-field.narrow { flex: 1 1 45%; }
+}

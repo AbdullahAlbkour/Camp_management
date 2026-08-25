@@ -11,26 +11,16 @@
     @endrole
 </section>
 
-<form method="get" class="filters">
-    <input type="search" name="q" value="{{ request('q') }}" placeholder="رمز الأسرة، رب الأسرة، رقم الوثيقة">
-    <select name="status">
-        <option value="">كل الحالات</option>
-        <option value="active" @selected(request('status') === 'active')>فعالة</option>
-        <option value="archived" @selected(request('status') === 'archived')>مؤرشفة</option>
-    </select>
-    <button class="secondary" type="submit"><i data-lucide="search"></i><span>بحث</span></button>
-    @if (request()->hasAny(['q', 'status']))
-        <a class="secondary" href="{{ route('households.index') }}"><i data-lucide="x"></i><span>مسح</span></a>
-    @endif
-</form>
+@include('partials.filter-bar', ['filter' => $filter, 'route' => 'households.index', 'total' => $rows->total()])
 
 <section class="table-wrap">
     <table>
         <thead>
             <tr>
-                <th>رمز الأسرة</th>
+                @include('partials.sortable-header', ['key' => 'code', 'label' => 'رمز الأسرة', 'route' => 'households.index'])
                 <th>رب الأسرة</th>
-                <th>عدد الأفراد</th>
+                <th>المخيم</th>
+                @include('partials.sortable-header', ['key' => 'members', 'label' => 'عدد الأفراد', 'route' => 'households.index'])
                 <th>الحالة</th>
                 <th>إجراءات</th>
             </tr>
@@ -38,10 +28,15 @@
         <tbody>
             @forelse ($rows as $household)
                 <tr>
-                    <td><strong>{{ $household->household_code }}</strong></td>
-                    <td>{{ $household->head?->full_name ?? '-' }}</td>
+                    <td><a class="row-link" href="{{ route('households.show', $household) }}">{{ $household->household_code }}</a></td>
+                    <td>{{ $household->head?->full_name ?? '—' }}</td>
+                    <td>{{ $household->head?->currentCamp?->name ?? '—' }}</td>
                     <td>{{ $household->members_count }}</td>
-                    <td><span class="badge {{ $household->status }}">{{ $household->status === 'active' ? 'فعالة' : 'مؤرشفة' }}</span></td>
+                    <td>
+                        <span class="badge {{ $household->status }}">
+                            {{ $household->status === 'active' ? 'فعالة' : 'مؤرشفة' }}
+                        </span>
+                    </td>
                     <td class="actions">
                         <a class="icon-link" href="{{ route('households.show', $household) }}" title="ملف الأسرة"><i data-lucide="eye"></i></a>
                         @role('admin','registration_officer')
@@ -50,7 +45,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="empty">لا توجد أسر مطابقة.</td></tr>
+                <tr><td colspan="6" class="empty">لا توجد أسر مطابقة للبحث أو الفلاتر.</td></tr>
             @endforelse
         </tbody>
     </table>

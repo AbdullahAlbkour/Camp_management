@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Filters\RefugeeFilter;
 use App\Http\Requests\RefugeeRequest;
 use App\Models\Camp;
 use App\Models\Household;
@@ -17,28 +18,16 @@ use Illuminate\View\View;
 
 class RefugeeController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, RefugeeFilter $filter): View
     {
-        $rows = Refugee::with(['currentCamp', 'currentShelter', 'household'])
-            ->when($request->q, function ($query, string $q): void {
-                $query->where(function ($inner) use ($q): void {
-                    $inner->where('document_number', 'like', '%'.$q.'%')
-                        ->orWhere('first_name', 'like', '%'.$q.'%')
-                        ->orWhere('father_name', 'like', '%'.$q.'%')
-                        ->orWhere('last_name', 'like', '%'.$q.'%')
-                        ->orWhere('phone', 'like', '%'.$q.'%');
-                });
-            })
-            ->when($request->camp_id, fn ($query, $campId) => $query->where('current_camp_id', $campId))
-            ->when($request->housing_status, fn ($query, $status) => $query->where('housing_status', $status))
-            ->when($request->status, fn ($query, $status) => $query->where('status', $status))
-            ->latest()
-            ->paginate(20)
-            ->withQueryString();
+        $rows = $filter->paginate(
+            Refugee::query()->with(['currentCamp', 'currentShelter', 'household']),
+            $request
+        );
 
         return view('refugees.index', [
             'rows' => $rows,
-            'camps' => Camp::pluck('name', 'id'),
+            'filter' => $filter,
         ]);
     }
 
