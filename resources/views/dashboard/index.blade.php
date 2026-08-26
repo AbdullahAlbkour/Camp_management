@@ -120,6 +120,11 @@
             'labels' => $charts['securityBySeverity']->pluck('name')->values(),
             'values' => $charts['securityBySeverity']->pluck('total')->values(),
         ],
+        // Donut series. Their slices are mutually exclusive, so each chart's
+        // values total a real whole instead of overlapping counts.
+        'shelterStates' => $shelterStates,
+        'refugeeStates' => $refugeeStates,
+        'aidMonth' => $aidMonth['by_type'],
     ];
 
     $kpis = [
@@ -203,17 +208,23 @@
 
     $tabs = [
         ['id' => 'occupancy', 'label' => 'الإشغال', 'icon' => 'activity'],
+        ['id' => 'shelterStates', 'label' => 'حالة الوحدات', 'icon' => 'pie-chart'],
         ['id' => 'residents', 'label' => 'السكان', 'icon' => 'users-round'],
+        ['id' => 'refugeeStates', 'label' => 'حالات السكان', 'icon' => 'chart-pie'],
         ['id' => 'daily', 'label' => 'النشاط', 'icon' => 'bar-chart-3'],
         ['id' => 'aid', 'label' => 'المساعدات', 'icon' => 'package-check'],
+        ['id' => 'aidMonth', 'label' => 'مساعدات الشهر', 'icon' => 'calendar-range'],
         ['id' => 'medical', 'label' => 'الطبي', 'icon' => 'heart-pulse'],
         ['id' => 'security', 'label' => 'الأمن', 'icon' => 'shield-alert'],
     ];
     $tabGroups = [
         'occupancy' => 'housing',
+        'shelterStates' => 'housing',
         'residents' => 'registration',
+        'refugeeStates' => 'registration',
         'daily' => 'management',
         'aid' => 'aid',
+        'aidMonth' => 'aid',
         'medical' => 'medical',
         'security' => 'security',
     ];
@@ -357,6 +368,62 @@
                     </section>
 
                     <aside class="dashboard-side grid content-start gap-2.5 xl:grid-rows-[auto_minmax(0,1fr)]">
+                        @if ($canShowGroup('aid'))
+                            @php
+                                $aidChange = $aidMonth['change_percentage'];
+                                $aidTiles = [
+                                    ['key' => 'operations', 'label' => 'عملية توزيع', 'value' => $formatNumber($aidMonth['operations']), 'icon' => 'package-check'],
+                                    ['key' => 'beneficiaries', 'label' => 'مستفيد', 'value' => $formatNumber($aidMonth['beneficiaries']), 'icon' => 'users-round'],
+                                    ['key' => 'quantity', 'label' => 'إجمالي الكميات', 'value' => $formatNumber($aidMonth['quantity']), 'icon' => 'boxes'],
+                                ];
+                            @endphp
+                            <section class="dashboard-card rounded-2xl border p-3 shadow-glass backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/80">
+                                <div class="mb-2 flex items-center justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <h2 class="text-base font-black text-slate-950 dark:text-white">مساعدات هذا الشهر</h2>
+                                        <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400">منذ {{ now()->startOfMonth()->format('Y-m-d') }}</p>
+                                    </div>
+                                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-amber-500/10 text-amber-600">
+                                        <i data-lucide="hand-heart" class="h-5 w-5"></i>
+                                    </span>
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-1.5">
+                                    @foreach ($aidTiles as $tile)
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-2 text-center dark:border-white/10 dark:bg-slate-800">
+                                            <i data-lucide="{{ $tile['icon'] }}" class="mx-auto h-4 w-4 text-amber-600"></i>
+                                            <span class="mt-1 block text-lg font-black leading-none text-slate-950 dark:text-white"
+                                                  data-aid-month="{{ $tile['key'] }}">{{ $tile['value'] }}</span>
+                                            <span class="mt-0.5 block text-[10px] font-bold leading-tight text-slate-500 dark:text-slate-400">{{ $tile['label'] }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+
+                                <div class="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-white/10 dark:bg-slate-800/60">
+                                    <span class="min-w-0 truncate text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                                        الأكثر توزيعًا: <strong class="text-slate-800 dark:text-slate-100" data-aid-month="top_type">{{ $aidMonth['top_type'] }}</strong>
+                                    </span>
+                                    @if ($aidChange === null)
+                                        {{-- No comparable window last month, so no percentage is claimed. --}}
+                                        <span class="shrink-0 text-[11px] font-bold text-slate-400">لا مقارنة</span>
+                                    @else
+                                        <span @class([
+                                            'inline-flex shrink-0 items-center gap-1 rounded-xl px-2 py-0.5 text-[11px] font-black',
+                                            'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' => $aidChange > 0,
+                                            'bg-rose-500/10 text-rose-700 dark:text-rose-400' => $aidChange < 0,
+                                            'bg-slate-500/10 text-slate-600 dark:text-slate-300' => $aidChange == 0,
+                                        ])>
+                                            <i data-lucide="{{ $aidChange > 0 ? 'trending-up' : ($aidChange < 0 ? 'trending-down' : 'minus') }}" class="h-3.5 w-3.5"></i>
+                                            {{ $aidChange > 0 ? '+' : '' }}{{ $formatNumber(abs($aidChange)) }}%
+                                        </span>
+                                    @endif
+                                </div>
+                                <p class="mt-1.5 text-[10px] font-bold leading-tight text-slate-400">
+                                    المقارنة مع نفس عدد الأيام من الشهر الماضي ({{ $formatNumber($aidMonth['previous_operations']) }} عملية).
+                                </p>
+                            </section>
+                        @endif
+
                         <section class="dashboard-card rounded-2xl border p-3 shadow-glass backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/80">
                             <div class="mb-2 flex items-center justify-between">
                                 <div>
@@ -477,8 +544,13 @@
                             if (data.charts) {
                                 this.payload = data.charts;
                                 if (this.chart) {
+                                    // Same type throughout a refresh, so an update is safe here.
                                     this.chart.updateOptions(this.options(), false, true);
                                 }
+                            }
+
+                            if (data.aidMonth) {
+                                this.updateAidMonth(data.aidMonth);
                             }
 
                             this.updateLiveStats(data.stats || {}, data.healthScore, data.criticalTasks);
@@ -487,6 +559,16 @@
                         } catch (error) {
                             console.warn('Dashboard live refresh failed', error);
                         }
+                    },
+
+                    updateAidMonth(aid) {
+                        document.querySelectorAll('[data-aid-month]').forEach((element) => {
+                            const key = element.dataset.aidMonth;
+                            if (aid[key] === undefined || aid[key] === null) return;
+                            element.textContent = typeof aid[key] === 'number'
+                                ? this.formatValue(aid[key])
+                                : String(aid[key]);
+                        });
                     },
 
                     updateLiveStats(stats, healthScore, criticalTasks) {
@@ -575,12 +657,34 @@
                             aid: { name: 'المساعدات', type: 'bar', color: '#c7a869', stroke: '#9b7f42' },
                             medical: { name: 'السجلات الطبية', type: 'area', color: '#73ad96', stroke: '#53856f' },
                             security: { name: 'التقارير الأمنية', type: 'bar', color: '#bf7a76', stroke: '#965b58' },
+                            // Donuts carry one hue per slice. The three-hue set was
+                            // checked for colour-vision separation rather than picked
+                            // by eye, and every slice is direct-labelled as well, so
+                            // identity never rests on colour alone.
+                            shelterStates: {
+                                name: 'الوحدات السكنية',
+                                type: 'donut',
+                                palette: ['#c8503a', '#0f8a5f', '#2f6fd0'],
+                                total: 'وحدة',
+                            },
+                            refugeeStates: {
+                                name: 'السكان',
+                                type: 'donut',
+                                palette: ['#0f8a5f', '#2f6fd0', '#b8791a'],
+                                total: 'شخص',
+                            },
+                            aidMonth: { name: 'مساعدات الشهر', type: 'bar', color: '#b8791a', stroke: '#8a5b12' },
                         }[this.activeChart];
                     },
 
                     options() {
                         const data = this.safeData(this.activeChart);
                         const meta = this.meta();
+
+                        if (meta.type === 'donut') {
+                            return this.donutOptions(data, meta);
+                        }
+
                         return {
                             chart: {
                                 type: meta.type,
@@ -655,12 +759,107 @@
                         };
                     },
 
+                    /**
+                     * A donut needs a flat series and top-level labels, unlike the
+                     * cartesian charts which take categories on the x axis.
+                     */
+                    donutOptions(data, meta) {
+                        const total = data.values.reduce((sum, value) => sum + value, 0);
+
+                        return {
+                            chart: {
+                                type: 'donut',
+                                height: '100%',
+                                fontFamily: 'Tajawal, Tahoma, Arial, sans-serif',
+                                toolbar: { show: false },
+                                foreColor: '#475569',
+                                animations: { enabled: true, easing: 'easeinout', speed: 650 },
+                            },
+                            series: data.values,
+                            labels: data.labels,
+                            colors: meta.palette,
+                            // A 2px gap in the surface colour keeps adjacent slices
+                            // readable without a heavy outline.
+                            stroke: { width: 2, colors: ['#ffffff'] },
+                            legend: {
+                                position: 'bottom',
+                                horizontalAlign: 'center',
+                                fontWeight: 800,
+                                fontSize: '12px',
+                                markers: { radius: 4 },
+                                itemMargin: { horizontal: 8, vertical: 4 },
+                            },
+                            dataLabels: {
+                                enabled: true,
+                                formatter: (percent) => `${Number(percent).toFixed(0)}%`,
+                                style: { fontSize: '12px', fontWeight: 900, colors: ['#ffffff'] },
+                                dropShadow: { enabled: false },
+                            },
+                            plotOptions: {
+                                pie: {
+                                    donut: {
+                                        size: '64%',
+                                        labels: {
+                                            show: true,
+                                            name: { fontSize: '13px', fontWeight: 800, color: '#475569' },
+                                            value: {
+                                                fontSize: '22px',
+                                                fontWeight: 900,
+                                                color: '#0f172a',
+                                                formatter: (value) => Number(value).toLocaleString('ar'),
+                                            },
+                                            total: {
+                                                show: true,
+                                                showAlways: true,
+                                                label: `الإجمالي (${meta.total})`,
+                                                fontSize: '12px',
+                                                fontWeight: 800,
+                                                color: '#64748b',
+                                                formatter: () => total.toLocaleString('ar'),
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            tooltip: {
+                                theme: 'light',
+                                y: {
+                                    formatter: (value) => {
+                                        const share = total > 0 ? Math.round((value / total) * 100) : 0;
+                                        return `${Number(value).toLocaleString('ar')} (${share}%)`;
+                                    },
+                                },
+                            },
+                            noData: {
+                                text: 'لا توجد بيانات كافية',
+                                style: { color: '#64748b', fontSize: '14px', fontFamily: 'Tajawal, Tahoma, Arial, sans-serif' },
+                            },
+                        };
+                    },
+
                     setChart(id) {
+                        const previousType = this.meta()?.type;
                         this.activeChart = id;
-                        if (this.chart) {
+                        const nextType = this.meta()?.type;
+
+                        // ApexCharts cannot switch between a cartesian chart and a
+                        // donut through updateOptions — the old axes survive and the
+                        // new series is misread. Only a same-type switch is an update.
+                        if (this.chart && previousType === nextType) {
                             this.chart.updateOptions(this.options(), true, true);
+                        } else {
+                            this.rebuildChart();
                         }
+
                         this.refreshIcons();
+                    },
+
+                    rebuildChart() {
+                        if (this.chart) {
+                            this.chart.destroy();
+                            this.chart = null;
+                        }
+                        this.renderChart();
                     },
 
                     renderChart() {
