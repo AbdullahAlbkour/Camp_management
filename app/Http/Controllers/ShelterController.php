@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Filters\ShelterFilter;
 use App\Http\Requests\ShelterRequest;
 use App\Models\Camp;
 use App\Models\Shelter;
@@ -12,27 +13,18 @@ use Illuminate\View\View;
 
 class ShelterController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, ShelterFilter $filter): View
     {
-        $rows = Shelter::with('camp')
-            ->withCount(['refugees as occupied' => fn ($query) => $query->where('status', 'active')])
-            ->when($request->camp_id, fn ($query, $campId) => $query->where('camp_id', $campId))
-            ->latest()
-            ->paginate(20);
+        $rows = $filter->paginate(
+            Shelter::query()
+                ->with('camp')
+                ->withCount(['refugees as occupied' => fn ($query) => $query->where('status', 'active')]),
+            $request
+        );
 
-        return view('crud.index', [
-            'title' => 'الوحدات السكنية',
-            'createRoute' => route('shelters.create'),
-            'columns' => [
-                ['label' => 'الرمز', 'field' => 'code'],
-                ['label' => 'المخيم', 'field' => 'camp.name'],
-                ['label' => 'النوع', 'field' => 'type'],
-                ['label' => 'السعة', 'field' => 'capacity'],
-                ['label' => 'الإشغال', 'field' => 'occupied'],
-                ['label' => 'الحالة', 'field' => 'status'],
-            ],
+        return view('shelters.index', [
             'rows' => $rows,
-            'editRoute' => 'shelters.edit',
+            'filter' => $filter,
         ]);
     }
 

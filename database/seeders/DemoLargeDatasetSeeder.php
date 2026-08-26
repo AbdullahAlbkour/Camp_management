@@ -12,6 +12,7 @@ use App\Models\Organization;
 use App\Models\Refugee;
 use App\Models\Shelter;
 use App\Models\User;
+use App\Support\RefugeeSearchIndex;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
@@ -70,6 +71,11 @@ class DemoLargeDatasetSeeder extends Seeder
         $this->seedEntryExitLogs($refugees, $checkpointsByCamp, $securityUserId, $now);
         $this->seedAidDistributions($refugees, $aidTypes, $aidUserId, $now);
         $this->seedOperationalNotifications($now);
+
+        // Refugees above are written with bulk inserts, which skip Eloquent
+        // events, so the folded search blob has to be built explicitly or the
+        // whole demo dataset would be invisible to search.
+        RefugeeSearchIndex::rebuild();
 
         $this->command?->info('Demo dataset created: 2000 refugees, 200 households, 10 camps, medical/security/movement/aid records.');
     }

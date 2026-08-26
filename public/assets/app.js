@@ -492,3 +492,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Advanced filters stay collapsed until asked for, but open automatically
+    // when a filter is already applied so nothing in effect is hidden.
+    document.querySelectorAll('[data-filter-bar]').forEach((bar) => {
+        const toggle = bar.querySelector('[data-filter-toggle]');
+        const panel = bar.querySelector('[data-filter-advanced]');
+        if (!toggle || !panel) return;
+
+        toggle.addEventListener('click', () => {
+            const open = panel.hidden;
+            panel.hidden = !open;
+            toggle.setAttribute('aria-expanded', String(open));
+        });
+
+        // Changing a select re-runs the search straight away; typed fields wait
+        // for Enter or the button so the page does not reload mid-word.
+        panel.querySelectorAll('select').forEach((select) => {
+            select.addEventListener('change', () => bar.submit());
+        });
+    });
+});
