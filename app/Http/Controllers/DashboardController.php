@@ -36,7 +36,15 @@ class DashboardController extends Controller
             'stats' => $stats,
             'healthScore' => $data['healthScore'],
             'criticalTasks' => $criticalTasks,
-            'charts' => $this->chartPayload($data['charts'], $data['occupancy'], $data['dailyActivity']),
+            'charts' => $this->chartPayload(
+                $data['charts'],
+                $data['occupancy'],
+                $data['dailyActivity'],
+                $data['shelterStates'],
+                $data['refugeeStates'],
+                $data['aidMonth'],
+            ),
+            'aidMonth' => $data['aidMonth'],
             'notifications' => $data['recentNotifications']
                 ->take(3)
                 ->map(fn (Notification $notification): array => [
@@ -146,6 +154,10 @@ class DashboardController extends Controller
             })
             ->values();
 
+        $shelterStates = $this->shelterStateBreakdown($shelterLoad);
+        $refugeeStates = $this->refugeeStateBreakdown();
+        $aidMonth = $this->aidThisMonth();
+
         $healthScore = max(0, 100 - min(85, ($stats['unassigned'] * 7) + ($stats['followups'] * 5) + ($stats['high_security'] * 12)));
         $dailyActivity = collect(range(6, 0))->map(function (int $daysAgo): array {
             $date = now()->subDays($daysAgo)->toDateString();
@@ -165,13 +177,143 @@ class DashboardController extends Controller
             'occupancy',
             'recentNotifications',
             'healthScore',
-            'dailyActivity'
+            'dailyActivity',
+            'shelterStates',
+            'refugeeStates',
+            'aidMonth'
         );
     }
 
-    private function chartPayload(array $charts, Collection $occupancy, Collection $dailyActivity): array
+    /**
+     * Units split into three mutually exclusive states, so the slices of a donut
+     * add up to the number of active units and none is double counted.
+     *
+     * Computed from the shelter collection already loaded for the occupancy
+     * figures rather than three more COUNT queries.
+     *
+     * @param  Collection<int, Shelter>  $shelterLoad
+     * @return array{labels: list<string>, values: list<int>}
+     */
+    private function shelterStateBreakdown(Collection $shelterLoad): array
     {
+        $active = $shelterLoad->where('status', 'active');
+
+        $full = $active->filter(fn (Shelter $s) => (int) $s->occupied >= (int) $s->capacity)->count();
+        $empty = $active->filter(fn (Shelter $s) => (int) $s->occupied === 0)->count();
+        // Partly occupied is the remainder, which keeps the three exclusive even
+        // if a unit is somehow over capacity.
+        $partial = max(0, $active->count() - $full - $empty);
+
         return [
+            'labels' => ['ممتلئة', 'مشغولة جزئيًا', 'فارغة'],
+            'values' => [$full, $partial, $empty],
+        ];
+    }
+
+    /**
+     * Active refugees by operational state. Housing status partitions the set, so
+     * the three slices are exclusive and total the active population.
+     *
+     * @return array{labels: list<string>, values: list<int>}
+     */
+    private function refugeeStateBreakdown(): array
+    {
+        $rows = Refugee::query()
+            ->where('status', 'active')
+            ->selectRaw('housing_status, presence_status, count(*) as total')
+            ->groupBy('housing_status', 'presence_status')
+            ->get();
+
+        $countFor = fn (string $housing, ?string $presence = null): int => (int) $rows
+            ->when($presence !== null, fn (Collection $r) => $r->where('presence_status', $presence))
+            ->where('housing_status', $housing)
+            ->sum('total');
+
+        return [
+            'labels' => ['مسكَّن وداخل المخيم', 'مسكَّن وخارج المخيم', 'بلا سكن'],
+            'values' => [
+                $countFor('assigned', 'inside'),
+                $countFor('assigned', 'outside'),
+                $countFor('unassigned'),
+            ],
+        ];
+    }
+
+    /**
+     * Aid handed out since the first of the current month, with the same window
+     * last month for comparison.
+     *
+     * @return array{
+     *     operations: int, quantity: float, beneficiaries: int, top_type: string,
+     *     previous_operations: int, change_percentage: float|null,
+     *     by_type: array{labels: list<string>, values: list<int>}
+     * }
+     */
+    private function aidThisMonth(): array
+    {
+        $start = now()->startOfMonth();
+        $previousStart = $start->copy()->subMonth();
+
+        $current = AidDistribution::query()->whereBetween('distribution_date', [$start, now()]);
+
+        $operations = (clone $current)->count();
+        $quantity = (float) (clone $current)->sum('quantity');
+
+        // A distribution targets a refugee or a household, never both, so the two
+        // distinct counts add up without overlap.
+        $beneficiaries = (clone $current)->whereNotNull('refugee_id')->distinct()->count('refugee_id')
+            + (clone $current)->whereNotNull('household_id')->distinct()->count('household_id');
+
+        $byType = AidDistribution::query()
+            ->whereBetween('distribution_date', [$start, now()])
+            ->join('aid_types', 'aid_types.id', '=', 'aid_distributions.aid_type_id')
+            ->select('aid_types.name', DB::raw('count(*) as total'))
+            ->groupBy('aid_types.name')
+            ->orderByDesc('total')
+            ->limit(8)
+            ->get();
+
+        // Same elapsed window last month, so a comparison on the 5th is against
+        // the 1st-to-5th of the previous month, not its full total.
+        $previousOperations = AidDistribution::query()
+            ->whereBetween('distribution_date', [$previousStart, $previousStart->copy()->addDays($start->diffInDays(now()))])
+            ->count();
+
+        return [
+            'operations' => $operations,
+            'quantity' => round($quantity, 2),
+            'beneficiaries' => $beneficiaries,
+            'top_type' => $byType->first()->name ?? '—',
+            'previous_operations' => $previousOperations,
+            'change_percentage' => $previousOperations > 0
+                ? round((($operations - $previousOperations) / $previousOperations) * 100, 1)
+                : null,
+            'by_type' => [
+                'labels' => $byType->pluck('name')->values()->all(),
+                'values' => $byType->pluck('total')->map(fn ($v) => (int) $v)->values()->all(),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array{labels: list<string>, values: list<int>}  $shelterStates
+     * @param  array{labels: list<string>, values: list<int>}  $refugeeStates
+     * @param  array<string, mixed>  $aidMonth
+     */
+    private function chartPayload(
+        array $charts,
+        Collection $occupancy,
+        Collection $dailyActivity,
+        array $shelterStates,
+        array $refugeeStates,
+        array $aidMonth
+    ): array {
+        return [
+            // Donut series: slices are mutually exclusive, so each chart's values
+            // total a meaningful whole rather than overlapping counts.
+            'shelterStates' => $shelterStates,
+            'refugeeStates' => $refugeeStates,
+            'aidMonth' => $aidMonth['by_type'],
             'occupancy' => [
                 'labels' => $occupancy->pluck('name')->values()->all(),
                 'values' => $occupancy->pluck('total')->values()->all(),
