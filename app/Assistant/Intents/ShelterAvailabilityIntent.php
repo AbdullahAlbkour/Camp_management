@@ -42,12 +42,22 @@ class ShelterAvailabilityIntent extends Intent
             return null;
         }
 
-        return $this->campIn($query) !== null ? 4 : 3;
+        // A camp reference is a further signal whether or not it resolves: an
+        // unnamed camp still has to reach handle() to be reported as missing.
+        return $this->campReference($query)->isResolved() ? 4 : 3;
     }
 
     public function handle(AssistantQuery $query, User $user): Answer
     {
-        $camp = $this->campIn($query);
+        $reference = $this->campReference($query);
+
+        // Asked about a camp the system does not have, the only honest answer is
+        // that it does not exist — never the totals of every other camp.
+        if ($reference->isUnknown()) {
+            return $this->unknownCamp($this->name(), $reference);
+        }
+
+        $camp = $reference->camp;
 
         $shelters = Shelter::query()
             ->where('status', 'active')
@@ -60,7 +70,7 @@ class ShelterAvailabilityIntent extends Intent
             return Answer::empty(
                 $this->name(),
                 $camp !== null
-                    ? 'لا توجد وحدات سكنية فعّالة مسجّلة في '.$this->campLabel($camp).'.'
+                    ? 'لا توجد وحدات سكنية فعّالة مسجّلة في '.$reference->label().'.'
                     : 'لا توجد وحدات سكنية فعّالة مسجّلة في النظام.',
             );
         }
@@ -80,7 +90,7 @@ class ShelterAvailabilityIntent extends Intent
             ['label' => 'أماكن شاغرة', 'value' => number_format($freeSpaces)],
         ];
 
-        $where = $camp !== null ? ' في '.$this->campLabel($camp) : '';
+        $where = $camp !== null ? ' في '.$reference->label() : '';
 
         return Answer::make(
             $this->name(),
@@ -132,6 +142,6 @@ class ShelterAvailabilityIntent extends Intent
 
     public function examples(): array
     {
-        return ['كم وحدة سكنية فارغة؟', 'ما الوحدات المتاحة في مخيم الزعتري؟'];
+        return ['كم وحدة سكنية فارغة؟', 'ما الوحدات المتاحة في {camp}؟'];
     }
 }

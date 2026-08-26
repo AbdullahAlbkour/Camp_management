@@ -40,12 +40,18 @@ class UnhousedIntent extends Intent
         }
 
         // The phrase is specific enough on its own; a named camp only narrows it.
-        return $this->campIn($query) !== null ? 4 : 3;
+        return $this->campReference($query)->isResolved() ? 4 : 3;
     }
 
     public function handle(AssistantQuery $query, User $user): Answer
     {
-        $camp = $this->campIn($query);
+        $reference = $this->campReference($query);
+
+        if ($reference->isUnknown()) {
+            return $this->unknownCamp($this->name(), $reference);
+        }
+
+        $camp = $reference->camp;
 
         $base = Refugee::query()
             ->where('status', 'active')
@@ -61,7 +67,7 @@ class UnhousedIntent extends Intent
             return Answer::empty(
                 $this->name(),
                 $camp !== null
-                    ? 'لا يوجد أحد بلا سكن في '.$this->campLabel($camp).' — كل السكان الفعّالين مخصص لهم سكن.'
+                    ? 'لا يوجد أحد بلا سكن في '.$reference->label().' — كل السكان الفعّالين مخصص لهم سكن.'
                     : 'لا يوجد أحد بلا سكن حاليًا — كل السكان الفعّالين مخصص لهم سكن.',
             );
         }
@@ -85,7 +91,7 @@ class UnhousedIntent extends Intent
         return Answer::make(
             $this->name(),
             $camp !== null
-                ? number_format($total).' من سكان '.$this->campLabel($camp).' بلا سكن حاليًا.'
+                ? number_format($total).' من سكان '.$reference->label().' بلا سكن حاليًا.'
                 : number_format($total).' من السكان الفعّالين بلا سكن حاليًا.',
             $waiting->map(fn (Refugee $refugee) => $this->refugeeItem($refugee))->all(),
             $figures,
@@ -110,6 +116,6 @@ class UnhousedIntent extends Intent
 
     public function examples(): array
     {
-        return ['كم لاجئًا بلا سكن؟', 'من بلا سكن في مخيم الزعتري؟'];
+        return ['كم لاجئًا بلا سكن؟', 'من بلا سكن في {camp}؟'];
     }
 }

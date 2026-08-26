@@ -44,12 +44,18 @@ class PopulationIntent extends Intent
 
         // Naming a camp is a third signal, which is what separates this from the
         // system-wide overview when both could answer.
-        return $this->campIn($query) !== null ? 3 : 2;
+        return $this->campReference($query)->isResolved() ? 3 : 2;
     }
 
     public function handle(AssistantQuery $query, User $user): Answer
     {
-        $camp = $this->campIn($query);
+        $reference = $this->campReference($query);
+
+        if ($reference->isUnknown()) {
+            return $this->unknownCamp($this->name(), $reference);
+        }
+
+        $camp = $reference->camp;
 
         $base = Refugee::query()->where('status', 'active');
 
@@ -63,7 +69,7 @@ class PopulationIntent extends Intent
             return Answer::empty(
                 $this->name(),
                 $camp !== null
-                    ? 'لا يوجد سكان فعّالون مسجّلون في '.$this->campLabel($camp).' حاليًا.'
+                    ? 'لا يوجد سكان فعّالون مسجّلون في '.$reference->label().' حاليًا.'
                     : 'لا يوجد سكان فعّالون مسجّلون في النظام حتى الآن.',
             );
         }
@@ -82,7 +88,7 @@ class PopulationIntent extends Intent
         return Answer::make(
             $this->name(),
             $camp !== null
-                ? 'عدد السكان الفعّالين في '.$this->campLabel($camp).' هو '.number_format($total).' شخصًا.'
+                ? 'عدد السكان الفعّالين في '.$reference->label().' هو '.number_format($total).' شخصًا.'
                 : 'إجمالي السكان الفعّالين في النظام '.number_format($total).' شخصًا.',
             $camp === null ? $this->perCamp() : [],
             $figures,
@@ -127,6 +133,6 @@ class PopulationIntent extends Intent
 
     public function examples(): array
     {
-        return ['كم عدد السكان في مخيم الزعتري؟', 'كم عدد اللاجئين المسجلين؟'];
+        return ['كم عدد السكان في {camp}؟', 'كم عدد اللاجئين المسجلين؟'];
     }
 }

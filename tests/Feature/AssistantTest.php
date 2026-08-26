@@ -348,6 +348,250 @@ class AssistantTest extends TestCase
         $this->assertSame([], $answer['links']);
     }
 
+    public function test_a_camp_that_does_not_exist_is_reported_instead_of_being_ignored(): void
+    {
+        // The reported defect: naming an unknown camp dropped the filter and the
+        // totals of every other camp were returned as though understood.
+        $this->actingAsRole('housing_officer');
+        $salam = Camp::factory()->create(['name' => 'مخيم السلام']);
+        Shelter::factory()->capacity(4)->count(3)->create(['camp_id' => $salam->id]);
+
+        $answer = $this->ask('ما الوحدات المتاحة في مخيم الزعتري؟');
+
+        $this->assertSame('empty', $answer['tone']);
+        $this->assertStringContainsString('لا يوجد مخيم', $answer['text']);
+        $this->assertSame([], $answer['figures']);
+        // No count from مخيم السلام may appear in an answer about a camp that
+        // does not exist.
+        $this->assertStringNotContainsString('وحدة فارغة', $answer['text']);
+    }
+
+    public function test_the_unknown_camp_answer_quotes_the_name_as_typed(): void
+    {
+        $this->actingAsRole('housing_officer');
+        Camp::factory()->create(['name' => 'مخيم السلام']);
+
+        $answer = $this->ask('كم وحدة فارغة في مخيم الأمل؟');
+
+        // Matching folds "الأمل" to "الامل"; the reply spells it back as written.
+        $this->assertStringContainsString('«الأمل»', $answer['text']);
+    }
+
+    public function test_the_unknown_camp_answer_lists_the_camps_that_do_exist(): void
+    {
+        $this->actingAsRole('registration_officer');
+        Camp::factory()->create(['name' => 'مخيم السلام']);
+        Camp::factory()->create(['name' => 'مخيم النور']);
+
+        $answer = $this->ask('كم عدد السكان في مخيم الزعتري؟');
+
+        $titles = array_column($answer['items'], 'title');
+        $this->assertContains('مخيم السلام', $titles);
+        $this->assertContains('مخيم النور', $titles);
+    }
+
+    public function test_the_unhoused_question_refuses_an_unknown_camp(): void
+    {
+        $this->actingAsRole('housing_officer');
+        $salam = Camp::factory()->create(['name' => 'مخيم السلام']);
+        Refugee::factory()->count(4)->create([
+            'current_camp_id' => $salam->id,
+            'housing_status' => 'unassigned',
+        ]);
+
+        $answer = $this->ask('كم لاجئًا بلا سكن في مخيم الزعتري؟');
+
+        $this->assertSame('empty', $answer['tone']);
+        $this->assertStringContainsString('لا يوجد مخيم', $answer['text']);
+        $this->assertSame([], $answer['figures']);
+    }
+
+    public function test_the_aid_summary_refuses_an_unknown_camp(): void
+    {
+        $this->actingAsRole('aid_officer');
+        Camp::factory()->create(['name' => 'مخيم السلام']);
+        AidDistribution::factory()->count(3)->create(['distribution_date' => now()->toDateString()]);
+
+        $answer = $this->ask('كم مساعدة وُزّعت في مخيم الزعتري هذا الشهر؟');
+
+        $this->assertSame('empty', $answer['tone']);
+        $this->assertStringContainsString('لا يوجد مخيم', $answer['text']);
+    }
+
+    public function test_a_question_with_no_camp_still_answers_for_the_whole_system(): void
+    {
+        // The strict check must not turn every system-wide question into a
+        // complaint about a missing camp.
+        $this->actingAsRole('registration_officer');
+        $camp = Camp::factory()->create(['name' => 'مخيم السلام']);
+        Refugee::factory()->count(5)->create(['current_camp_id' => $camp->id, 'status' => 'active']);
+
+        $answer = $this->ask('كم عدد السكان المسجلين؟');
+
+        $this->assertSame('population', $answer['intent']);
+        $this->assertContains(['label' => 'إجمالي السكان', 'value' => '5'], $answer['figures']);
+    }
+
+    public function test_the_bare_word_camp_with_no_name_is_not_treated_as_a_missing_camp(): void
+    {
+        $this->actingAsRole('registration_officer');
+        $camp = Camp::factory()->create(['name' => 'مخيم السلام']);
+        Refugee::factory()->count(3)->create(['current_camp_id' => $camp->id, 'status' => 'active']);
+
+        $answer = $this->ask('كم عدد السكان في المخيم؟');
+
+        $this->assertSame('population', $answer['intent']);
+        $this->assertContains(['label' => 'إجمالي السكان', 'value' => '3'], $answer['figures']);
+    }
+
+    public function test_the_plural_asks_about_every_camp_rather_than_naming_one(): void
+    {
+        $this->actingAsRole('registration_officer');
+        $a = Camp::factory()->create(['name' => 'مخيم السلام']);
+        $b = Camp::factory()->create(['name' => 'مخيم النور']);
+        Refugee::factory()->count(2)->create(['current_camp_id' => $a->id, 'status' => 'active']);
+        Refugee::factory()->count(4)->create(['current_camp_id' => $b->id, 'status' => 'active']);
+
+        $answer = $this->ask('كم عدد السكان في المخيمات؟');
+
+        $this->assertSame('population', $answer['intent']);
+        $this->assertContains(['label' => 'إجمالي السكان', 'value' => '6'], $answer['figures']);
+    }
+
+    public function test_a_time_phrase_after_the_camp_word_is_not_read_as_a_camp_name(): void
+    {
+        // "مخيم" followed by a period word must not report a camp called "اليوم".
+        $this->actingAsRole('aid_officer');
+        $camp = Camp::factory()->create(['name' => 'النور']);
+        AidDistribution::factory()->count(2)->create([
+            'camp_id' => $camp->id,
+            'distribution_date' => now()->toDateString(),
+        ]);
+
+        $answer = $this->ask('كم مساعدة وُزّعت في مخيم النور اليوم؟');
+
+        $this->assertSame('aid_summary', $answer['intent']);
+        $this->assertContains(['label' => 'عمليات التوزيع', 'value' => '2'], $answer['figures']);
+    }
+
+    public function test_an_existing_camp_named_without_the_word_camp_still_resolves(): void
+    {
+        $this->actingAsRole('registration_officer');
+        $camp = Camp::factory()->create(['name' => 'الزعتري']);
+        Refugee::factory()->count(7)->create(['current_camp_id' => $camp->id, 'status' => 'active']);
+        Refugee::factory()->count(2)->create(['status' => 'active']);
+
+        $answer = $this->ask('كم عدد السكان في الزعتري؟');
+
+        $this->assertContains(['label' => 'إجمالي السكان', 'value' => '7'], $answer['figures']);
+    }
+
+    public function test_an_existing_camp_with_zero_results_reads_differently_from_a_missing_one(): void
+    {
+        // "no shelters registered there" and "that camp does not exist" are
+        // different facts and must not share a sentence.
+        $this->actingAsRole('housing_officer');
+        Camp::factory()->create(['name' => 'مخيم الزعتري']);
+
+        $answer = $this->ask('ما الوحدات المتاحة في مخيم الزعتري؟');
+
+        $this->assertStringContainsString('لا توجد وحدات سكنية فعّالة', $answer['text']);
+        $this->assertStringNotContainsString('لا يوجد مخيم', $answer['text']);
+    }
+
+    public function test_households_are_counted_only_for_the_camp_named(): void
+    {
+        $this->actingAsRole('registration_officer');
+        $salam = Camp::factory()->create(['name' => 'مخيم السلام']);
+        $nour = Camp::factory()->create(['name' => 'مخيم النور']);
+
+        $here = Household::factory()->create();
+        Refugee::factory()->count(2)->create(['household_id' => $here->id, 'current_camp_id' => $salam->id]);
+
+        $elsewhere = Household::factory()->create();
+        Refugee::factory()->count(3)->create(['household_id' => $elsewhere->id, 'current_camp_id' => $nour->id]);
+
+        $answer = $this->ask('كم عدد الأسر في مخيم السلام؟');
+
+        $this->assertSame('household', $answer['intent']);
+        $this->assertContains(['label' => 'عدد الأسر', 'value' => '1'], $answer['figures']);
+    }
+
+    public function test_the_household_count_refuses_an_unknown_camp(): void
+    {
+        $this->actingAsRole('registration_officer');
+        Camp::factory()->create(['name' => 'مخيم السلام']);
+        Household::factory()->count(4)->create();
+
+        $answer = $this->ask('كم عدد الأسر في مخيم الزعتري؟');
+
+        $this->assertSame('empty', $answer['tone']);
+        $this->assertStringContainsString('لا يوجد مخيم', $answer['text']);
+        $this->assertSame([], $answer['figures']);
+    }
+
+    public function test_a_refugee_who_does_not_exist_is_reported_not_substituted(): void
+    {
+        $this->actingAsRole('registration_officer');
+        Refugee::factory()->create(['first_name' => 'أحمد', 'father_name' => null, 'last_name' => 'الحسن']);
+
+        $answer = $this->ask('ابحث عن زياد المصري');
+
+        $this->assertSame('empty', $answer['tone']);
+        $this->assertSame([], $answer['items']);
+        $this->assertStringContainsString('لم أجد', $answer['text']);
+    }
+
+    public function test_housing_status_for_an_unknown_person_returns_nobody_elses_address(): void
+    {
+        $this->actingAsRole('housing_officer');
+        $camp = Camp::factory()->create();
+        $shelter = Shelter::factory()->create(['camp_id' => $camp->id]);
+        Refugee::factory()->inShelter($shelter->id, $camp->id)->create([
+            'first_name' => 'أحمد', 'father_name' => null, 'last_name' => 'الحسن',
+        ]);
+
+        $answer = $this->ask('أين يسكن زياد المصري؟');
+
+        $this->assertSame('empty', $answer['tone']);
+        $this->assertSame([], $answer['items']);
+        $this->assertSame([], $answer['figures']);
+    }
+
+    public function test_a_household_code_that_does_not_exist_is_reported(): void
+    {
+        $this->actingAsRole('registration_officer');
+        Household::factory()->create(['household_code' => 'HH-0001']);
+
+        $answer = $this->ask('أفراد أسرة HH-9999');
+
+        $this->assertSame('empty', $answer['tone']);
+        $this->assertSame([], $answer['items']);
+        $this->assertStringContainsString('لم أجد أسرة', $answer['text']);
+    }
+
+    public function test_example_questions_name_a_camp_that_actually_exists(): void
+    {
+        $this->actingAsRole('housing_officer');
+        Camp::factory()->create(['name' => 'مخيم النور', 'status' => 'active']);
+
+        $suggestions = $this->getJson(route('assistant.suggestions'))->json('suggestions');
+        $joined = implode(' | ', $suggestions);
+
+        $this->assertStringContainsString('مخيم النور', $joined);
+        $this->assertStringNotContainsString('{camp}', $joined);
+    }
+
+    public function test_example_questions_survive_a_system_with_no_camps_yet(): void
+    {
+        $this->actingAsRole('housing_officer');
+
+        $suggestions = $this->getJson(route('assistant.suggestions'))->json('suggestions');
+
+        $this->assertNotEmpty($suggestions);
+        $this->assertStringNotContainsString('{camp}', implode(' | ', $suggestions));
+    }
+
     public function test_a_housing_officer_gets_the_link_to_act_on_the_answer(): void
     {
         $this->actingAsRole('housing_officer');

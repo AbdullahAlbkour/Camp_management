@@ -4,6 +4,7 @@ namespace App\Assistant\Intents;
 
 use App\Assistant\Answer;
 use App\Assistant\AssistantQuery;
+use App\Assistant\CampReference;
 use App\Assistant\Intent;
 use App\Assistant\ResolvesEntities;
 use App\Models\Household;
@@ -46,13 +47,22 @@ class HouseholdIntent extends Intent
 
     public function handle(AssistantQuery $query, User $user): Answer
     {
-        $subject = $query->subject(self::TRIGGERS);
+        $reference = $this->campReference($query);
+
+        if ($reference->isUnknown()) {
+            return $this->unknownCamp($this->name(), $reference);
+        }
+
+        // The camp phrase is dropped before the rest is read as a name, so
+        // "كم عدد الأسر في مخيم السلام" is a count for that camp rather than a
+        // search for a household called "مخيم السلام".
+        $subject = $query->subject(array_merge(self::TRIGGERS, $this->campWords($query)));
         $codes = $query->codes();
 
         // A counting question with nothing to identify one household is asking
-        // about the whole register.
+        // about the register, narrowed to the camp when one was named.
         if ($codes === [] && ArabicText::isTooShort($subject, 2) && $query->hasAny(self::COUNTING)) {
-            return $this->overview();
+            return $this->overview($reference);
         }
 
         $matches = Household::query()
@@ -73,7 +83,7 @@ class HouseholdIntent extends Intent
 
         if ($matches->isEmpty()) {
             return $codes === [] && ArabicText::isTooShort($subject, 2)
-                ? $this->overview()
+                ? $this->overview($reference)
                 : Answer::empty($this->name(), 'لم أجد أسرة تطابق «'.($subject ?: implode(' ', $codes)).'».');
         }
 
@@ -115,20 +125,35 @@ class HouseholdIntent extends Intent
         );
     }
 
-    private function overview(): Answer
+    private function overview(CampReference $reference): Answer
     {
-        $total = Household::query()->count();
+        $camp = $reference->camp;
+
+        // A household has no camp of its own; it is wherever its members are —
+        // the same rule the household screen filters by.
+        $households = Household::query()
+            ->when($camp !== null, fn ($q) => $q->whereHas(
+                'members',
+                fn ($member) => $member->where('current_camp_id', $camp->id)
+            ));
+
+        $total = (clone $households)->count();
+        $where = $camp !== null ? ' في '.$reference->label() : '';
 
         if ($total === 0) {
-            return Answer::empty($this->name(), 'لا توجد أسر مسجّلة في النظام حتى الآن.');
+            return Answer::empty($this->name(), 'لا توجد أسر مسجّلة'.$where.' حتى الآن.');
         }
 
-        $withoutHead = Household::query()->whereNull('head_of_household_id')->count();
-        $members = Refugee::query()->whereNotNull('household_id')->where('status', 'active')->count();
+        $withoutHead = (clone $households)->whereNull('head_of_household_id')->count();
+        $members = Refugee::query()
+            ->whereNotNull('household_id')
+            ->where('status', 'active')
+            ->when($camp !== null, fn ($q) => $q->where('current_camp_id', $camp->id))
+            ->count();
 
         return Answer::make(
             $this->name(),
-            'يوجد '.number_format($total).' أسرة مسجّلة، تضم '.number_format($members).' فردًا فعّالًا.',
+            'يوجد '.number_format($total).' أسرة مسجّلة'.$where.'، تضم '.number_format($members).' فردًا فعّالًا.',
             [],
             [
                 ['label' => 'عدد الأسر', 'value' => number_format($total)],
@@ -136,7 +161,11 @@ class HouseholdIntent extends Intent
                 ['label' => 'بلا رب أسرة', 'value' => number_format($withoutHead)],
                 ['label' => 'متوسط الحجم', 'value' => number_format($members / $total, 1)],
             ],
-            [['label' => 'فتح قائمة الأسر', 'url' => route('households.index'), 'icon' => 'house']],
+            [[
+                'label' => 'فتح قائمة الأسر',
+                'url' => route('households.index', array_filter(['camp_id' => $camp?->id])),
+                'icon' => 'house',
+            ]],
         );
     }
 

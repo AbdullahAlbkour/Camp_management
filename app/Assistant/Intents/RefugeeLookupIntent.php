@@ -54,7 +54,7 @@ class RefugeeLookupIntent extends Intent
             return Answer::empty(
                 $this->name(),
                 'لم أجد أي لاجئ يطابق «'.$subject.'». جرّب رقم الوثيقة، أو جزءًا من الاسم فقط.',
-                ['كم عدد السكان؟', 'كم لاجئًا بلا سكن؟'],
+                followUps: ['كم عدد السكان؟', 'كم لاجئًا بلا سكن؟'],
             );
         }
 

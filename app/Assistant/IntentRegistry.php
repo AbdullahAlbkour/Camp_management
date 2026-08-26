@@ -12,6 +12,7 @@ use App\Assistant\Intents\PopulationIntent;
 use App\Assistant\Intents\RefugeeLookupIntent;
 use App\Assistant\Intents\ShelterAvailabilityIntent;
 use App\Assistant\Intents\UnhousedIntent;
+use App\Models\Camp;
 use App\Models\User;
 use App\Support\RoleScope;
 
@@ -79,14 +80,33 @@ class IntentRegistry
      */
     public function examplesFor(?User $user, int $limit = 6): array
     {
+        $camp = $this->sampleCampName();
         $examples = [];
 
         foreach ($this->forUser($user) as $intent) {
             foreach ($intent->examples() as $example) {
-                $examples[] = $example;
+                $examples[] = str_replace('{camp}', $camp, $example);
             }
         }
 
         return array_slice(array_values(array_unique($examples)), 0, $limit);
+    }
+
+    /**
+     * A camp that actually exists, for the examples that name one.
+     *
+     * Suggesting "كم عدد السكان في مخيم الزعتري" to a deployment with no such
+     * camp invites a question the assistant can only refuse.
+     */
+    private function sampleCampName(): string
+    {
+        $name = Camp::query()->where('status', 'active')->orderBy('name')->value('name')
+            ?? Camp::query()->orderBy('name')->value('name');
+
+        if ($name === null) {
+            return 'مخيم المثال';
+        }
+
+        return str_starts_with(trim($name), 'مخيم') ? $name : 'مخيم '.$name;
     }
 }

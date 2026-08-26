@@ -4,6 +4,7 @@ namespace App\Assistant\Intents;
 
 use App\Assistant\Answer;
 use App\Assistant\AssistantQuery;
+use App\Assistant\CampReference;
 use App\Assistant\Intent;
 use App\Assistant\ResolvesEntities;
 use App\Models\Refugee;
@@ -91,7 +92,7 @@ class HousingStatusIntent extends Intent
 
         $text = $refugee->housing_status === 'assigned'
             ? $refugee->full_name.' مسكَّن في '.($refugee->currentShelter?->display_name ?? 'وحدة غير محددة')
-                .($refugee->currentCamp !== null ? ' ب'.$this->campLabel($refugee->currentCamp) : '').'.'
+                .($refugee->currentCamp !== null ? ' ب'.CampReference::of($refugee->currentCamp)->label() : '').'.'
             : $refugee->full_name.' غير مخصص له سكن حتى الآن.';
 
         return Answer::make(
