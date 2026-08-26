@@ -7,8 +7,12 @@ use App\Models\AidType;
 use App\Models\Camp;
 use App\Models\Household;
 use App\Models\Refugee;
+use App\Models\ResidencyTransfer;
 use App\Models\Shelter;
+use App\Services\AssistantService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Tests\TestCase;
 
 class AssistantTest extends TestCase
@@ -590,6 +594,92 @@ class AssistantTest extends TestCase
 
         $this->assertNotEmpty($suggestions);
         $this->assertStringNotContainsString('{camp}', implode(' | ', $suggestions));
+    }
+
+    public function test_housing_status_reports_the_date_of_the_last_transfer(): void
+    {
+        // Regression: this figure was ordered and read by a column that does not
+        // exist (transfer_date; the column is transferred_at). SQLite accepts an
+        // unknown identifier in ORDER BY as a string literal, so the whole suite
+        // passed while MySQL answered the request with a 500.
+        $this->actingAsRole('housing_officer');
+        $camp = Camp::factory()->create();
+        $shelter = Shelter::factory()->create(['camp_id' => $camp->id]);
+        $refugee = Refugee::factory()->inShelter($shelter->id, $camp->id)->create([
+            'first_name' => 'وليد', 'father_name' => null, 'last_name' => 'الشامي',
+        ]);
+
+        ResidencyTransfer::factory()->create([
+            'refugee_id' => $refugee->id,
+            'transferred_at' => now()->subDays(9),
+        ]);
+        ResidencyTransfer::factory()->create([
+            'refugee_id' => $refugee->id,
+            'transferred_at' => now()->subDay(),
+        ]);
+
+        $answer = $this->ask('أين يسكن وليد الشامي؟');
+
+        $this->assertSame('housing_status', $answer['intent']);
+        $this->assertContains(
+            ['label' => 'آخر انتقال', 'value' => now()->subDay()->format('Y-m-d')],
+            $answer['figures'],
+            'The most recent transfer must be the one reported.'
+        );
+    }
+
+    public function test_a_common_first_name_returns_the_matches_rather_than_failing(): void
+    {
+        // The reported case: "اين يسكن محمد" matches many people.
+        $this->actingAsRole('housing_officer');
+        $camp = Camp::factory()->create();
+        $shelter = Shelter::factory()->capacity(9)->create(['camp_id' => $camp->id]);
+
+        foreach (['العلي', 'الحسن', 'الخطيب'] as $family) {
+            Refugee::factory()->inShelter($shelter->id, $camp->id)->create([
+                'first_name' => 'محمد', 'father_name' => null, 'last_name' => $family,
+            ]);
+        }
+
+        $answer = $this->ask('اين يسكن محمد');
+
+        $this->assertSame('housing_status', $answer['intent']);
+        $this->assertCount(3, $answer['items']);
+    }
+
+    public function test_an_unexpected_failure_answers_with_an_apology_not_a_500(): void
+    {
+        $this->actingAsRole('registration_officer');
+
+        // Stand in for any future breakage inside the assistant.
+        $this->mock(AssistantService::class, function ($mock): void {
+            $mock->shouldReceive('ask')->andThrow(new RuntimeException('boom'));
+            $mock->shouldReceive('suggestions')->andReturn([]);
+        });
+
+        $response = $this->postJson(route('assistant.ask'), ['question' => 'كم عدد السكان؟'])
+            ->assertOk();
+
+        $this->assertSame('error', $response->json('answer.tone'));
+        $this->assertStringContainsString('تعذّر', $response->json('answer.text'));
+        // The cause must not be handed to the browser.
+        $this->assertStringNotContainsString('boom', $response->getContent());
+    }
+
+    public function test_a_failure_is_logged_with_the_question_that_caused_it(): void
+    {
+        $this->actingAsRole('registration_officer');
+
+        $this->mock(AssistantService::class, function ($mock): void {
+            $mock->shouldReceive('ask')->andThrow(new RuntimeException('boom'));
+            $mock->shouldReceive('suggestions')->andReturn([]);
+        });
+
+        Log::shouldReceive('error')
+            ->once()
+            ->withArgs(fn (string $message, array $context) => $context['question'] === 'كم عدد السكان؟');
+
+        $this->postJson(route('assistant.ask'), ['question' => 'كم عدد السكان؟'])->assertOk();
     }
 
     public function test_a_housing_officer_gets_the_link_to_act_on_the_answer(): void

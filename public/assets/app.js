@@ -629,6 +629,9 @@ document.addEventListener('DOMContentLoaded', () => {
             empty: 'is-bot is-empty',
             denied: 'is-bot is-denied',
             unknown: 'is-bot is-empty',
+            // A server-side failure that was handled gracefully still has to
+            // look like a failure, so it is never mistaken for a result.
+            error: 'is-bot is-error',
         }[tone] ?? 'is-bot';
     }
 
