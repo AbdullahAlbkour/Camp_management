@@ -49,7 +49,7 @@ class AidSummaryIntent extends Intent
             $signals++;
         }
 
-        if ($this->campIn($query) !== null) {
+        if ($this->campReference($query)->isResolved()) {
             $signals++;
         }
 
@@ -58,7 +58,13 @@ class AidSummaryIntent extends Intent
 
     public function handle(AssistantQuery $query, User $user): Answer
     {
-        $camp = $this->campIn($query);
+        $reference = $this->campReference($query);
+
+        if ($reference->isUnknown()) {
+            return $this->unknownCamp($this->name(), $reference);
+        }
+
+        $camp = $reference->camp;
         [$from, $to, $label] = TimeWindow::range(TimeWindow::in($query));
 
         $base = AidDistribution::query()
@@ -66,7 +72,7 @@ class AidSummaryIntent extends Intent
             ->when($camp !== null, fn ($q) => $q->where('camp_id', $camp->id));
 
         $operations = (clone $base)->count();
-        $where = $camp !== null ? ' في '.$this->campLabel($camp) : '';
+        $where = $camp !== null ? ' في '.$reference->label() : '';
 
         if ($operations === 0) {
             return Answer::empty(
@@ -114,6 +120,6 @@ class AidSummaryIntent extends Intent
 
     public function examples(): array
     {
-        return ['كم مساعدة وُزّعت هذا الشهر؟', 'مساعدات مخيم الزعتري هذا الأسبوع'];
+        return ['كم مساعدة وُزّعت هذا الشهر؟', 'مساعدات {camp} هذا الأسبوع'];
     }
 }

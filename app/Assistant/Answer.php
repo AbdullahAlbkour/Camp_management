@@ -48,11 +48,12 @@ final class Answer
      * A question understood but answered by "nothing matched", which reads
      * differently from a failure and is styled differently in the widget.
      *
+     * @param  list<array{title: string, subtitle?: string, meta?: string, url?: string}>  $items
      * @param  list<string>  $followUps
      */
-    public static function empty(string $intent, string $text, array $followUps = []): self
+    public static function empty(string $intent, string $text, array $items = [], array $followUps = []): self
     {
-        return new self($intent, $text, followUps: $followUps, tone: 'empty');
+        return new self($intent, $text, items: $items, followUps: $followUps, tone: 'empty');
     }
 
     /**

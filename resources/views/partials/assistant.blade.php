@@ -40,7 +40,7 @@
         <form class="assistant-form" data-assistant-form>
             <label class="sr-only" for="assistantQuestion">اكتب سؤالك</label>
             <textarea id="assistantQuestion" name="question" rows="1" maxlength="300" autocomplete="off"
-                      placeholder="مثال: كم عدد السكان في مخيم الزعتري؟" data-assistant-input></textarea>
+                      placeholder="مثال: {{ $assistantSuggestions[0] ?? 'كم عدد السكان المسجلين؟' }}" data-assistant-input></textarea>
             <button type="submit" title="إرسال" aria-label="إرسال السؤال" data-assistant-send>
                 <i data-lucide="send-horizontal"></i>
             </button>

@@ -23,6 +23,15 @@ final class AssistantQuery
     public readonly array $words;
 
     /**
+     * The same tokens taken from the untouched text, index for index with
+     * `$words`. Matching runs on the folded form, but a name quoted back to the
+     * user should be spelled the way they typed it.
+     *
+     * @var list<string>
+     */
+    public readonly array $rawWords;
+
+    /**
      * Words that carry no meaning for matching and must not survive into an
      * extracted name: "ابحث عن أحمد" has to yield "احمد", not "عن احمد".
      *
@@ -44,8 +53,22 @@ final class AssistantQuery
     {
         $this->raw = trim($raw);
         $this->text = ArabicText::normalize($raw);
-        $this->words = array_values(array_filter(
-            preg_split('/[\s،؛,.:؟?!"\'()\[\]-]+/u', $this->text) ?: [],
+        $this->words = self::tokenize($this->text);
+
+        // Folding can drop a character and, very rarely, empty a token outright,
+        // which would slide the two lists out of step. They are only paired when
+        // the counts agree; otherwise the folded form is quoted back instead.
+        $raw = self::tokenize($this->raw);
+        $this->rawWords = count($raw) === count($this->words) ? $raw : $this->words;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function tokenize(string $value): array
+    {
+        return array_values(array_filter(
+            preg_split('/[\s،؛,.:؟?!"\'()\[\]-]+/u', $value) ?: [],
             static fn (string $word) => $word !== ''
         ));
     }
