@@ -45,8 +45,19 @@
                 @if ($type === 'select')
                     <select name="{{ $name }}" class="js-searchable-select" @required($field['required'] ?? false)>
                         <option value="">-- اختر --</option>
+                        {{-- A nested options array renders as optgroups, so a long
+                             list can be read by section instead of scanned whole.
+                             A flat array keeps behaving exactly as before. --}}
                         @foreach ($field['options'] ?? [] as $optionValue => $optionLabel)
-                            <option value="{{ $optionValue }}" @selected((string) $value === (string) $optionValue)>{{ $optionLabel }}</option>
+                            @if (is_array($optionLabel))
+                                <optgroup label="{{ $optionValue }}">
+                                    @foreach ($optionLabel as $groupedValue => $groupedLabel)
+                                        <option value="{{ $groupedValue }}" @selected((string) $value === (string) $groupedValue)>{{ $groupedLabel }}</option>
+                                    @endforeach
+                                </optgroup>
+                            @else
+                                <option value="{{ $optionValue }}" @selected((string) $value === (string) $optionValue)>{{ $optionLabel }}</option>
+                            @endif
                         @endforeach
                     </select>
                 @elseif ($type === 'textarea')

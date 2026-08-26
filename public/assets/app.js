@@ -123,11 +123,18 @@ document.addEventListener('DOMContentLoaded', () => {
         input.className = 'select-filter';
         input.placeholder = 'اكتب لتصفية القائمة...';
         select.before(input);
+        const groups = Array.from(select.querySelectorAll('optgroup'));
         input.addEventListener('input', () => {
             const term = input.value.trim().toLowerCase();
             Array.from(select.options).forEach((option) => {
-                const text = option.textContent.toLowerCase();
+                // A grouped option also matches on its group's label, so typing a
+                // camp name narrows the list to that camp's gates.
+                const text = (option.textContent + ' ' + (option.parentElement.label || '')).toLowerCase();
                 option.hidden = Boolean(term) && !text.includes(term);
+            });
+            // A group whose options are all hidden leaves an empty heading behind.
+            groups.forEach((group) => {
+                group.hidden = Array.from(group.children).every((option) => option.hidden);
             });
         });
     });
