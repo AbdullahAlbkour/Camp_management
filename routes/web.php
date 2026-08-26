@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AidController;
 use App\Http\Controllers\ArchiveController;
+use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
@@ -47,6 +48,12 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/search', [SearchController::class, 'index'])->name('search.index');
     Route::get('/search/suggest', [SearchController::class, 'suggest'])->name('search.suggest');
+
+    // The assistant reads only; every answer runs a query written in an intent
+    // class, so the throttle is about protecting the database from a stuck
+    // client rather than about guarding a model budget.
+    Route::post('/assistant/ask', [AssistantController::class, 'ask'])->middleware('throttle:40,1')->name('assistant.ask');
+    Route::get('/assistant/suggestions', [AssistantController::class, 'suggestions'])->name('assistant.suggestions');
 
     Route::get('/lookups/refugees', [LookupController::class, 'refugees'])->name('lookups.refugees');
     Route::get('/lookups/households', [LookupController::class, 'households'])->name('lookups.households');

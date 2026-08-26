@@ -83,6 +83,8 @@
             @include('layouts.flash')
             @yield('content')
         </main>
+
+        @include('partials.assistant')
     </div>
 @else
     @yield('content')

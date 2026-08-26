@@ -7,6 +7,7 @@ use App\Models\Household;
 use App\Models\Refugee;
 use App\Models\Shelter;
 use App\Models\User;
+use App\Support\ArabicText;
 use Illuminate\Support\Collection;
 
 /**
@@ -53,16 +54,16 @@ class GlobalSearchService
      */
     private function refugees(string $term): array
     {
-        $like = '%'.$term.'%';
+        // Matched against the folded blob rather than column by column. The old
+        // per-column LIKE could not find "نادر حمود" at all: the term spans the
+        // first and last name, so no single column contains it. The blob also
+        // brings the Arabic folding with it, so "احمد" finds "أحمد".
+        $folded = ArabicText::normalize($term);
 
         $items = Refugee::query()
             ->with(['currentCamp', 'currentShelter'])
-            ->where(function ($query) use ($like, $term): void {
-                $query->where('first_name', 'like', $like)
-                    ->orWhere('father_name', 'like', $like)
-                    ->orWhere('last_name', 'like', $like)
-                    ->orWhere('document_number', 'like', $like)
-                    ->orWhere('phone', 'like', $like)
+            ->where(function ($query) use ($folded, $term): void {
+                $query->where('search_text', 'like', '%'.$folded.'%')
                     ->orWhere('id', '=', ctype_digit($term) ? (int) $term : 0);
             })
             ->limit(self::PER_GROUP)

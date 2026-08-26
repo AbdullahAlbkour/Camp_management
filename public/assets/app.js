@@ -514,3 +514,225 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const root = document.querySelector('[data-assistant]');
+    if (!root) return;
+
+    const endpoint = root.dataset.assistant;
+    const panel = root.querySelector('[data-assistant-toggle]')?.getAttribute('aria-controls')
+        ? document.getElementById(root.querySelector('[data-assistant-toggle]').getAttribute('aria-controls'))
+        : null;
+    const toggle = root.querySelector('[data-assistant-toggle]');
+    const closeButton = root.querySelector('[data-assistant-close]');
+    const log = root.querySelector('[data-assistant-log]');
+    const form = root.querySelector('[data-assistant-form]');
+    const input = root.querySelector('[data-assistant-input]');
+    const send = root.querySelector('[data-assistant-send]');
+
+    if (!panel || !toggle || !log || !form || !input) return;
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+    let pending = false;
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
+    }
+
+    function scrollToEnd() {
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function setOpen(open) {
+        panel.hidden = !open;
+        root.classList.toggle('is-open', open);
+        toggle.setAttribute('aria-expanded', String(open));
+
+        if (open) {
+            input.focus();
+            scrollToEnd();
+        }
+    }
+
+    function bubble(className, html) {
+        const node = document.createElement('div');
+        node.className = `assistant-msg ${className}`;
+        node.innerHTML = html;
+        log.appendChild(node);
+        scrollToEnd();
+        return node;
+    }
+
+    function renderFigures(figures) {
+        if (!figures?.length) return '';
+
+        const cells = figures.map((figure) => `
+            <span><b>${escapeHtml(figure.value)}</b><em>${escapeHtml(figure.label)}</em></span>`).join('');
+
+        return `<div class="assistant-figures">${cells}</div>`;
+    }
+
+    function renderItems(items) {
+        if (!items?.length) return '';
+
+        // A row without a url is a record the viewer may read about but has no
+        // screen for; it renders as plain text rather than a link that 403s.
+        const rows = items.map((item) => {
+            const inner = `
+                <strong>${escapeHtml(item.title)}</strong>
+                <em>${escapeHtml(item.meta || '')}</em>
+                <span>${escapeHtml(item.subtitle || '')}</span>`;
+
+            return item.url
+                ? `<a href="${escapeHtml(item.url)}">${inner}</a>`
+                : `<div>${inner}</div>`;
+        }).join('');
+
+        return `<div class="assistant-items">${rows}</div>`;
+    }
+
+    function renderLinks(links) {
+        if (!links?.length) return '';
+
+        const anchors = links.map((link) => `
+            <a href="${escapeHtml(link.url)}">
+                <i data-lucide="${escapeHtml(link.icon || 'arrow-left')}"></i>${escapeHtml(link.label)}
+            </a>`).join('');
+
+        return `<div class="assistant-links">${anchors}</div>`;
+    }
+
+    function renderFollowUps(followUps) {
+        if (!followUps?.length) return;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'assistant-chips';
+        wrap.innerHTML = followUps
+            .map((text) => `<button type="button" data-assistant-example="${escapeHtml(text)}">${escapeHtml(text)}</button>`)
+            .join('');
+
+        log.appendChild(wrap);
+        scrollToEnd();
+    }
+
+    function toneClass(tone) {
+        return {
+            empty: 'is-bot is-empty',
+            denied: 'is-bot is-denied',
+            unknown: 'is-bot is-empty',
+        }[tone] ?? 'is-bot';
+    }
+
+    function renderAnswer(answer) {
+        bubble(
+            toneClass(answer.tone),
+            `<p>${escapeHtml(answer.text)}</p>`
+            + renderFigures(answer.figures)
+            + renderItems(answer.items)
+            + renderLinks(answer.links)
+        );
+
+        renderFollowUps(answer.follow_ups);
+
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    }
+
+    function ask(question) {
+        if (pending || !question) return;
+
+        pending = true;
+        if (send) send.disabled = true;
+
+        bubble('is-user', `<p>${escapeHtml(question)}</p>`);
+
+        const thinking = bubble(
+            'is-bot',
+            '<span class="assistant-typing"><i></i><i></i><i></i></span>'
+        );
+
+        fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ question }),
+        })
+            .then((response) => (response.ok ? response.json() : Promise.reject(response)))
+            .then((payload) => {
+                thinking.remove();
+                renderAnswer(payload.answer);
+            })
+            .catch((error) => {
+                thinking.remove();
+                // 429 is the throttle, and saying so beats a generic failure the
+                // user would answer by retrying immediately.
+                const text = error?.status === 429
+                    ? 'أسئلة كثيرة في وقت قصير. انتظر دقيقة ثم أعد المحاولة.'
+                    : 'تعذّر الوصول إلى الخادم. تحقق من الاتصال ثم أعد المحاولة.';
+
+                bubble('is-bot is-error', `<p>${text}</p>`);
+            })
+            .finally(() => {
+                pending = false;
+                if (send) send.disabled = false;
+                input.focus();
+            });
+    }
+
+    toggle.addEventListener('click', () => setOpen(panel.hidden));
+    closeButton?.addEventListener('click', () => {
+        setOpen(false);
+        toggle.focus();
+    });
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const question = input.value.trim();
+        input.value = '';
+        input.style.height = 'auto';
+        ask(question);
+    });
+
+    // Enter sends, Shift+Enter breaks the line — the convention every chat box
+    // has trained people to expect.
+    input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            form.requestSubmit();
+        }
+    });
+
+    input.addEventListener('input', () => {
+        input.style.height = 'auto';
+        input.style.height = `${Math.min(input.scrollHeight, 110)}px`;
+    });
+
+    // Suggestion chips are added as answers arrive, so the handler is delegated
+    // rather than bound to the ones present at load.
+    log.addEventListener('click', (event) => {
+        const chip = event.target.closest('[data-assistant-example]');
+        if (!chip) return;
+
+        ask(chip.dataset.assistantExample);
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+            event.preventDefault();
+            setOpen(panel.hidden);
+            return;
+        }
+
+        if (event.key === 'Escape' && !panel.hidden) {
+            setOpen(false);
+            toggle.focus();
+        }
+    });
+});
