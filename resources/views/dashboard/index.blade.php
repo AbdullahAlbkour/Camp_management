@@ -82,17 +82,9 @@
     $formatNumber = fn ($value, int $decimals = 0) => number_format((float) $value, $decimals);
     $emptyUnits = $stats['empty_shelters'] ?? max(0, $stats['shelters'] - $stats['assigned']);
     $criticalTasks = $stats['unassigned'] + $stats['followups'] + $stats['high_security'] + $stats['notifications'];
-    $roleName = auth()->user()->role?->name ?? 'guest';
-    $dashboardProfiles = [
-        'admin' => ['title' => 'لوحة التحكم', 'subtitle' => 'نظرة شاملة على تشغيل النظام.', 'groups' => ['registration', 'housing', 'medical', 'security', 'aid', 'management']],
-        'manager' => ['title' => 'لوحة الإدارة', 'subtitle' => 'مؤشرات تنفيذية مختصرة للمتابعة.', 'groups' => ['registration', 'housing', 'medical', 'security', 'aid', 'management']],
-        'registration_officer' => ['title' => 'لوحة التسجيل', 'subtitle' => 'السكان والأسر وآخر عمليات التسجيل.', 'groups' => ['registration', 'management']],
-        'housing_officer' => ['title' => 'لوحة السكن', 'subtitle' => 'الإشغال والوحدات والحالات غير المخصصة.', 'groups' => ['housing', 'management']],
-        'aid_officer' => ['title' => 'لوحة المساعدات', 'subtitle' => 'التوزيع والطلبات ومؤشرات الدعم.', 'groups' => ['aid', 'management']],
-        'medical_officer' => ['title' => 'لوحة الطب', 'subtitle' => 'المتابعات الطبية والسجلات المفتوحة.', 'groups' => ['medical', 'management']],
-        'security_officer' => ['title' => 'لوحة الأمن', 'subtitle' => 'البلاغات والحركة والمخاطر العالية.', 'groups' => ['security', 'management']],
-    ];
-    $dashboardProfile = $dashboardProfiles[$roleName] ?? $dashboardProfiles['manager'];
+    // Role profiles live in App\Support\RoleScope so the assistant gates its
+    // answers on exactly the same map this dashboard renders from.
+    $dashboardProfile = \App\Support\RoleScope::profile(auth()->user());
     $canShowGroup = fn (string $group) => in_array($group, $dashboardProfile['groups'], true);
 
     $chartPayload = [
