@@ -12,6 +12,7 @@ use App\Models\SecurityReport;
 use App\Services\AuditLogService;
 use App\Services\MovementSecurityService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class SecurityController extends Controller
@@ -78,6 +79,37 @@ class SecurityController extends Controller
         ]);
     }
 
+    /**
+     * Every checkpoint in the system, grouped under its camp.
+     *
+     * All camps are listed, not only the one the refugee lives in: people cross
+     * between camps, and a passage that happened has to be recordable. The camp
+     * is the group heading rather than a suffix on each row, so a long list is
+     * read by section instead of scanned whole, and the gate name stays short.
+     *
+     * Inactive gates are shown but marked. Hiding them would silently make an
+     * old movement impossible to record after a gate is closed.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function checkpointOptions(): array
+    {
+        return Checkpoint::query()
+            ->with('camp')
+            ->orderBy('name')
+            ->get()
+            ->sortBy(fn (Checkpoint $checkpoint) => $checkpoint->camp?->name ?? '')
+            ->groupBy(fn (Checkpoint $checkpoint) => $checkpoint->camp?->name ?? 'بدون مخيم')
+            ->map(fn (Collection $group) => $group
+                ->mapWithKeys(fn (Checkpoint $checkpoint) => [
+                    $checkpoint->id => $checkpoint->status === 'active'
+                        ? $checkpoint->name
+                        : $checkpoint->name.' (غير فعالة)',
+                ])
+                ->all())
+            ->all();
+    }
+
     public function createMovement(): View
     {
         return view('crud.form', [
@@ -88,7 +120,7 @@ class SecurityController extends Controller
             'model' => new EntryExitLog,
             'fields' => [
                 ['name' => 'refugee_id', 'label' => 'اللاجئ', 'type' => 'async-refugee', 'required' => true, 'url' => route('lookups.refugees'), 'placeholder' => 'ابحث بالاسم أو الوثيقة أو الهاتف'],
-                ['name' => 'checkpoint_id', 'label' => 'نقطة التفتيش', 'type' => 'select', 'required' => true, 'options' => Checkpoint::with('camp')->get()->mapWithKeys(fn ($c) => [$c->id => $c->name.' - '.$c->camp?->name])],
+                ['name' => 'checkpoint_id', 'label' => 'نقطة التفتيش', 'type' => 'select', 'required' => true, 'options' => $this->checkpointOptions()],
                 ['name' => 'movement_type', 'label' => 'نوع الحركة', 'type' => 'select', 'required' => true, 'options' => ['entry' => 'دخول', 'exit' => 'خروج']],
                 ['name' => 'movement_datetime', 'label' => 'التاريخ والوقت', 'type' => 'datetime-local', 'required' => true, 'value' => now()->format('Y-m-d\TH:i')],
                 ['name' => 'reason', 'label' => 'السبب', 'type' => 'textarea'],

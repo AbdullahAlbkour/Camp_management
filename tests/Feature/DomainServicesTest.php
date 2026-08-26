@@ -180,6 +180,62 @@ class DomainServicesTest extends TestCase
         $this->assertSame(2, Refugee::count());
     }
 
+    public function test_the_movement_form_offers_checkpoints_from_every_camp(): void
+    {
+        $this->actingAsRole('security_officer');
+        $here = Camp::factory()->create(['name' => 'مخيم السلام']);
+        $elsewhere = Camp::factory()->create(['name' => 'مخيم النور']);
+        Checkpoint::factory()->create(['camp_id' => $here->id, 'name' => 'البوابة الشمالية']);
+        Checkpoint::factory()->create(['camp_id' => $elsewhere->id, 'name' => 'البوابة الجنوبية']);
+
+        $this->get(route('security.movements.create'))
+            ->assertOk()
+            ->assertSee('البوابة الشمالية')
+            ->assertSee('البوابة الجنوبية')
+            // Grouped under the camp rather than repeated on every row.
+            ->assertSee('<optgroup label="مخيم السلام">', false)
+            ->assertSee('<optgroup label="مخيم النور">', false);
+    }
+
+    public function test_a_closed_checkpoint_is_still_offered_but_marked(): void
+    {
+        // Hiding it would make an older movement impossible to record after the
+        // gate is closed.
+        $this->actingAsRole('security_officer');
+        Checkpoint::factory()->create(['name' => 'البوابة القديمة', 'status' => 'inactive']);
+
+        $this->get(route('security.movements.create'))
+            ->assertOk()
+            ->assertSee('البوابة القديمة (غير فعالة)');
+    }
+
+    public function test_recording_a_cross_camp_movement_through_the_screen_succeeds(): void
+    {
+        // The block used to be raised inside the service, so the form accepted
+        // the choice and then rejected the save. This covers the whole path.
+        $this->actingAsRole('security_officer');
+        $checkpoint = Checkpoint::factory()->create();
+        $refugee = Refugee::factory()->create();
+
+        $this->assertNotSame($checkpoint->camp_id, $refugee->current_camp_id);
+
+        $this->from(route('security.movements.create'))
+            ->post(route('security.movements.store'), [
+                'refugee_id' => $refugee->id,
+                'checkpoint_id' => $checkpoint->id,
+                'movement_type' => 'exit',
+                'movement_datetime' => now()->toDateTimeString(),
+            ])
+            ->assertRedirect(route('security.movements'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('entry_exit_logs', [
+            'refugee_id' => $refugee->id,
+            'checkpoint_id' => $checkpoint->id,
+            'camp_id' => $checkpoint->camp_id,
+        ]);
+    }
+
     // ---- Aid ----
 
     public function test_aid_must_target_exactly_one_beneficiary(): void
@@ -282,19 +338,62 @@ class DomainServicesTest extends TestCase
 
     // ---- Movement and security ----
 
-    public function test_a_checkpoint_from_another_camp_is_refused(): void
+    public function test_a_movement_can_be_recorded_at_another_camps_checkpoint(): void
     {
+        // People do cross between camps. Refusing to log a passage that happened
+        // leaves a gap in the record rather than preventing anything.
         $checkpoint = Checkpoint::factory()->create();
         $refugee = Refugee::factory()->create();
 
-        $this->expectException(ValidationException::class);
-
-        app(MovementSecurityService::class)->recordMovement([
+        $movement = app(MovementSecurityService::class)->recordMovement([
             'refugee_id' => $refugee->id,
             'checkpoint_id' => $checkpoint->id,
             'movement_type' => 'exit',
             'movement_datetime' => now()->toDateTimeString(),
         ]);
+
+        $this->assertSame($checkpoint->id, $movement->checkpoint_id);
+    }
+
+    public function test_a_movement_is_filed_under_the_camp_of_the_gate(): void
+    {
+        // The row names a checkpoint; a camp column holding a different camp
+        // would contradict it. The movement happened where the gate is.
+        $checkpoint = Checkpoint::factory()->create();
+        $refugee = Refugee::factory()->create();
+
+        $this->assertNotSame($checkpoint->camp_id, $refugee->current_camp_id);
+
+        $movement = app(MovementSecurityService::class)->recordMovement([
+            'refugee_id' => $refugee->id,
+            'checkpoint_id' => $checkpoint->id,
+            'movement_type' => 'entry',
+            'movement_datetime' => now()->toDateTimeString(),
+        ]);
+
+        $this->assertSame($checkpoint->camp_id, $movement->camp_id);
+    }
+
+    public function test_crossing_into_another_camp_does_not_relocate_the_refugee(): void
+    {
+        // Residence changes go through HousingService, which enforces capacity
+        // and writes the transfer history. A gate reading must not bypass it.
+        $checkpoint = Checkpoint::factory()->create();
+        $refugee = Refugee::factory()->create();
+        $originalCamp = $refugee->current_camp_id;
+
+        app(MovementSecurityService::class)->recordMovement([
+            'refugee_id' => $refugee->id,
+            'checkpoint_id' => $checkpoint->id,
+            'movement_type' => 'entry',
+            'movement_datetime' => now()->toDateTimeString(),
+        ]);
+
+        $refugee->refresh();
+
+        $this->assertSame($originalCamp, $refugee->current_camp_id);
+        $this->assertSame('inside', $refugee->presence_status);
+        $this->assertSame(0, $refugee->residencyTransfers()->count());
     }
 
     public function test_an_exit_marks_the_refugee_as_outside_without_moving_them(): void
