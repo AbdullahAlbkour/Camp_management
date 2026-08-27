@@ -645,6 +645,66 @@ class AssistantTest extends TestCase
 
         $this->assertSame('housing_status', $answer['intent']);
         $this->assertCount(3, $answer['items']);
+        // No figure may be reported: none of the three is "the" person.
+        $this->assertSame([], $answer['figures']);
+    }
+
+    public function test_an_ambiguous_name_is_told_how_to_narrow_it(): void
+    {
+        // "اختر السجل" is no help to someone who typed the only name they had.
+        $this->actingAsRole('housing_officer');
+        $camp = Camp::factory()->create();
+
+        foreach (['العلي', 'الحسن'] as $family) {
+            Refugee::factory()->create([
+                'first_name' => 'محمد', 'father_name' => null, 'last_name' => $family,
+                'current_camp_id' => $camp->id,
+            ]);
+        }
+
+        $answer = $this->ask('اين يسكن محمد');
+
+        $this->assertStringContainsString('الاسم الثلاثي', $answer['text']);
+        $this->assertStringContainsString('رقم الوثيقة', $answer['text']);
+        $this->assertStringContainsString('محمد', $answer['text']);
+    }
+
+    public function test_an_ambiguous_aid_question_is_told_how_to_narrow_it_too(): void
+    {
+        $this->actingAsRole('aid_officer');
+
+        foreach (['العلي', 'الحسن'] as $family) {
+            Refugee::factory()->create([
+                'first_name' => 'محمد', 'father_name' => null, 'last_name' => $family,
+            ]);
+        }
+
+        $answer = $this->ask('ماذا استلم محمد من مساعدات؟');
+
+        $this->assertSame('aid_for_refugee', $answer['intent']);
+        $this->assertStringContainsString('الاسم الثلاثي', $answer['text']);
+        $this->assertCount(2, $answer['items']);
+    }
+
+    public function test_the_full_three_part_name_resolves_a_single_person(): void
+    {
+        // The guidance has to actually work: given the full name, one record.
+        $this->actingAsRole('housing_officer');
+        $camp = Camp::factory()->create();
+        $shelter = Shelter::factory()->capacity(5)->create(['camp_id' => $camp->id]);
+
+        Refugee::factory()->inShelter($shelter->id, $camp->id)->create([
+            'first_name' => 'محمد', 'father_name' => 'سالم', 'last_name' => 'العلي',
+        ]);
+        Refugee::factory()->inShelter($shelter->id, $camp->id)->create([
+            'first_name' => 'محمد', 'father_name' => 'خالد', 'last_name' => 'الحسن',
+        ]);
+
+        $answer = $this->ask('أين يسكن محمد سالم العلي؟');
+
+        $this->assertCount(1, $answer['items']);
+        $this->assertSame('محمد سالم العلي', $answer['items'][0]['title']);
+        $this->assertNotEmpty($answer['figures']);
     }
 
     public function test_an_unexpected_failure_answers_with_an_apology_not_a_500(): void

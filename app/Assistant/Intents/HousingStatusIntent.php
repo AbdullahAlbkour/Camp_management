@@ -68,11 +68,7 @@ class HousingStatusIntent extends Intent
         }
 
         if ($matches->count() > 1) {
-            return Answer::make(
-                $this->name(),
-                'أكثر من شخص يطابق ما كتبت. اختر السجل المقصود:',
-                $matches->map(fn (Refugee $refugee) => $this->refugeeItem($refugee))->all(),
-            );
+            return $this->tooManyPeople($this->name(), $matches, $query->subject(self::TRIGGERS));
         }
 
         /** @var Refugee $refugee */
