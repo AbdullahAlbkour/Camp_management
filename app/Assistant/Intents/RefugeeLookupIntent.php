@@ -66,7 +66,7 @@ class RefugeeLookupIntent extends Intent
             $this->name(),
             $text,
             $matches->map(fn ($refugee) => $this->refugeeItem($refugee))->all(),
-            followUps: ['أين يسكن '.($matches->first()->first_name ?? '').'؟'],
+            followUps: ['أين يسكن '.($matches->first()?->full_name ?? '').'؟'],
         );
     }
 

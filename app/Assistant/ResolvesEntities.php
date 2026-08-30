@@ -252,6 +252,30 @@ trait ResolvesEntities
     }
 
     /**
+     * Several people match the name, so the question cannot be answered about
+     * one of them.
+     *
+     * The reply says how to narrow it rather than only that it is ambiguous:
+     * in a camp of thousands a given name matches dozens, and "اختر السجل" is
+     * no help to someone who typed the only name they had. The matches are
+     * still listed so a click can settle it in one step.
+     *
+     * @param  Collection<int, Refugee>  $matches
+     */
+    protected function tooManyPeople(string $intent, Collection $matches, string $subject = ''): Answer
+    {
+        $named = $subject !== '' ? '«'.$subject.'»' : 'هذا الاسم';
+
+        return Answer::make(
+            $intent,
+            $matches->count().' أشخاص يطابقون '.$named.'. اكتب الاسم الثلاثي كاملًا أو رقم الوثيقة'
+                .' لتحديد الشخص، أو اختر من القائمة:',
+            $matches->map(fn (Refugee $refugee) => $this->refugeeItem($refugee))->values()->all(),
+            followUps: ['أين يسكن '.($matches->first()?->full_name ?? '').'؟'],
+        );
+    }
+
+    /**
      * Wording for a person the question did not pin down.
      */
     protected function noSubject(string $intent): Answer

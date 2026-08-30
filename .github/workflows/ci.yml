@@ -63,7 +63,7 @@ jobs:
         run: vendor/bin/phpunit
 
   migrations:
-    name: Migrations against MySQL
+    name: Migrations and tests against MySQL
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -109,3 +109,21 @@ jobs:
         run: |
           php artisan migrate --seed --no-interaction
           php artisan migrate:rollback --no-interaction
+
+      # The suite also runs against MySQL, because SQLite does not reject every
+      # query MySQL rejects. An unknown identifier in ORDER BY is the case that
+      # got through: SQLite reads `"no_such_column"` as a string literal and
+      # sorts by a constant, so a query naming a column that does not exist
+      # passed every test and returned a 500 in production. Running the same
+      # tests on both engines is what makes that class visible.
+      - name: Run the test suite against MySQL
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: camps_management_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS camps_management_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+          vendor/bin/phpunit

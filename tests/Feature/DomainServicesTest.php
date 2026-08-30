@@ -8,6 +8,7 @@ use App\Models\Checkpoint;
 use App\Models\Household;
 use App\Models\MedicalService;
 use App\Models\Notification;
+use App\Models\Organization;
 use App\Models\Refugee;
 use App\Models\ResidencyTransfer;
 use App\Models\Shelter;
@@ -234,6 +235,70 @@ class DomainServicesTest extends TestCase
             'checkpoint_id' => $checkpoint->id,
             'camp_id' => $checkpoint->camp_id,
         ]);
+    }
+
+    public function test_the_checkpoint_field_offers_checkpoints_and_nothing_else(): void
+    {
+        // Guards the field against ever being widened into another model. The
+        // list is built from Checkpoint alone, and this holds that: an
+        // organisation, a shelter or an aid type must never appear among gates.
+        $this->actingAsRole('security_officer');
+        $camp = Camp::factory()->create(['name' => 'مخيم السلام']);
+        Checkpoint::factory()->create(['camp_id' => $camp->id, 'name' => 'البوابة الشمالية']);
+
+        Organization::factory()->create(['name' => 'اليونيسف']);
+        Organization::factory()->create(['name' => 'الهلال الأحمر']);
+        AidType::factory()->create(['name' => 'سلة غذائية']);
+        Shelter::factory()->create(['camp_id' => $camp->id, 'code' => 'Z-99']);
+
+        $html = $this->get(route('security.movements.create'))->assertOk()->getContent();
+        $select = $this->checkpointSelectHtml($html);
+
+        $this->assertStringContainsString('البوابة الشمالية', $select);
+
+        foreach (['اليونيسف', 'الهلال الأحمر', 'سلة غذائية', 'Z-99'] as $foreign) {
+            $this->assertStringNotContainsString($foreign, $select, $foreign.' must not appear among checkpoints.');
+        }
+    }
+
+    public function test_every_option_in_the_checkpoint_field_is_a_real_checkpoint(): void
+    {
+        $this->actingAsRole('security_officer');
+        Organization::factory()->count(3)->create();
+        $checkpoints = Checkpoint::factory()->count(4)->create();
+
+        $html = $this->get(route('security.movements.create'))->assertOk()->getContent();
+
+        preg_match_all('/<option value="(\d+)"/', $this->checkpointSelectHtml($html), $matches);
+        $offered = array_map('intval', $matches[1]);
+
+        $this->assertNotEmpty($offered);
+        $this->assertEqualsCanonicalizing($checkpoints->pluck('id')->all(), $offered);
+    }
+
+    public function test_an_archived_checkpoint_is_not_offered(): void
+    {
+        $this->actingAsRole('security_officer');
+        Checkpoint::factory()->create(['name' => 'البوابة القائمة']);
+        Checkpoint::factory()->create(['name' => 'البوابة المحذوفة'])->delete();
+
+        $select = $this->checkpointSelectHtml(
+            $this->get(route('security.movements.create'))->assertOk()->getContent()
+        );
+
+        $this->assertStringContainsString('البوابة القائمة', $select);
+        $this->assertStringNotContainsString('البوابة المحذوفة', $select);
+    }
+
+    /**
+     * Just the checkpoint <select>, so an assertion cannot pass or fail on text
+     * that happens to sit elsewhere on the page.
+     */
+    private function checkpointSelectHtml(string $html): string
+    {
+        $this->assertSame(1, preg_match('/<select name="checkpoint_id".*?<\/select>/s', $html, $matches));
+
+        return $matches[0];
     }
 
     // ---- Aid ----

@@ -66,6 +66,16 @@ final class Answer
     }
 
     /**
+     * Something went wrong while answering. Kept distinct from "understood but
+     * found nothing" so the widget can style it as a failure and nobody reads
+     * an error as a result.
+     */
+    public static function failed(string $text): self
+    {
+        return new self('error', $text, tone: 'error');
+    }
+
+    /**
      * @param  list<string>  $followUps
      */
     public static function unknown(string $text, array $followUps = []): self

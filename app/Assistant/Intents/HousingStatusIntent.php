@@ -68,16 +68,12 @@ class HousingStatusIntent extends Intent
         }
 
         if ($matches->count() > 1) {
-            return Answer::make(
-                $this->name(),
-                'أكثر من شخص يطابق ما كتبت. اختر السجل المقصود:',
-                $matches->map(fn (Refugee $refugee) => $this->refugeeItem($refugee))->all(),
-            );
+            return $this->tooManyPeople($this->name(), $matches, $query->subject(self::TRIGGERS));
         }
 
         /** @var Refugee $refugee */
         $refugee = $matches->first();
-        $lastMove = $refugee->residencyTransfers()->latest('transfer_date')->first();
+        $lastMove = $refugee->residencyTransfers()->latest('transferred_at')->first();
 
         $figures = [
             ['label' => 'المخيم', 'value' => $refugee->currentCamp?->name ?? '—'],
@@ -86,8 +82,8 @@ class HousingStatusIntent extends Intent
             ['label' => 'الوجود', 'value' => Labels::get('presence_status', $refugee->presence_status)],
         ];
 
-        if ($lastMove?->transfer_date !== null) {
-            $figures[] = ['label' => 'آخر انتقال', 'value' => $lastMove->transfer_date->format('Y-m-d')];
+        if ($lastMove?->transferred_at !== null) {
+            $figures[] = ['label' => 'آخر انتقال', 'value' => $lastMove->transferred_at->format('Y-m-d')];
         }
 
         $text = $refugee->housing_status === 'assigned'
