@@ -3,10 +3,15 @@
 namespace App\Assistant;
 
 use App\Models\Camp;
+use App\Models\Checkpoint;
+use App\Models\Household;
+use App\Models\Organization;
 use App\Models\Refugee;
+use App\Models\Shelter;
 use App\Support\ArabicText;
 use App\Support\Labels;
 use App\Support\SearchExpression;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 /**
@@ -203,7 +208,42 @@ trait ResolvesEntities
             return new Collection;
         }
 
-        return $base->where('search_text', 'like', '%'.$name.'%')->limit($limit)->get();
+        // Arabic glues the preposition onto the name it introduces, so "آخر حركة
+        // لكرم" leaves "لكرم" where the register holds "كرم". Both spellings are
+        // tried: a wrong strip simply matches nothing extra.
+        $spellings = array_values(array_unique(array_filter([$name, $this->withoutAttachedPreposition($name)])));
+
+        return $base
+            ->where(function ($inner) use ($spellings): void {
+                foreach ($spellings as $spelling) {
+                    $inner->orWhere('search_text', 'like', '%'.$spelling.'%');
+                }
+            })
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * The name with a leading و/ب/ل/ك dropped from its first word, or an empty
+     * string when dropping it would leave too little to search on.
+     */
+    private function withoutAttachedPreposition(string $name): string
+    {
+        $words = preg_split('/\s+/u', $name) ?: [];
+
+        if ($words === []) {
+            return '';
+        }
+
+        $first = preg_replace('/^(و|ب|ل|ك|ف)/u', '', $words[0]) ?? $words[0];
+
+        if ($first === $words[0] || mb_strlen($first) < 2) {
+            return '';
+        }
+
+        $words[0] = $first;
+
+        return implode(' ', $words);
     }
 
     /**
@@ -284,6 +324,169 @@ trait ResolvesEntities
             $intent,
             'لم أتعرف على اسم أو رقم في سؤالك. اكتب الاسم أو رقم الوثيقة بعد السؤال، مثل: «أين يسكن أحمد الحسن؟».',
         );
+    }
+
+    /**
+     * Code-like tokens read straight off the folded question.
+     *
+     * `AssistantQuery::codes()` reads the tokenised form, and tokenising splits
+     * on the hyphen — so a unit code like "A-01" arrives as the fragments "a"
+     * and "01" and never matches the column it names. Codes are therefore
+     * matched against the folded text, where the hyphen is still intact.
+     *
+     * @return list<string>
+     */
+    protected function codeCandidates(AssistantQuery $query): array
+    {
+        preg_match_all('/[a-z0-9]+(?:-[a-z0-9]+)*/u', $query->text, $matches);
+
+        $codes = array_filter(
+            $matches[0],
+            static fn (string $token) => preg_match('/\d/u', $token) === 1 && mb_strlen($token) >= 2
+        );
+
+        // Longest first: "hh-demo-0001" is a better identifier than the "0001"
+        // sitting inside it, and trying it first avoids a needless wide scan.
+        usort($codes, static fn (string $a, string $b) => mb_strlen($b) <=> mb_strlen($a));
+
+        return array_values(array_unique($codes));
+    }
+
+    /**
+     * The shelters a question points at by code.
+     *
+     * Exact matches are returned alone when there are any: someone who typed a
+     * full unit code means that unit, and a partial scan would bury it under
+     * every code that merely contains the same digits.
+     *
+     * @return Collection<int, Shelter>
+     */
+    protected function sheltersIn(AssistantQuery $query, int $limit = 5): Collection
+    {
+        $candidates = $this->codeCandidates($query);
+
+        if ($candidates === []) {
+            return new Collection;
+        }
+
+        $base = fn () => Shelter::query()
+            ->with('camp')
+            ->withCount(['refugees' => fn ($inner) => $inner->where('status', 'active')]);
+
+        foreach (['=', 'like'] as $operator) {
+            $matches = $base()
+                ->where(function ($inner) use ($candidates, $operator): void {
+                    foreach ($candidates as $code) {
+                        $inner->orWhereRaw(
+                            SearchExpression::lower('code').' '.$operator.' ?',
+                            [$operator === 'like' ? '%'.$code.'%' : $code]
+                        );
+                    }
+                })
+                ->limit($limit)
+                ->get();
+
+            if ($matches->isNotEmpty()) {
+                return $matches;
+            }
+        }
+
+        return new Collection;
+    }
+
+    /**
+     * The households a question points at, by code or by the head's name.
+     *
+     * @param  list<string>  $triggers
+     * @return Collection<int, Household>
+     */
+    protected function householdsIn(AssistantQuery $query, array $triggers, int $limit = 5): Collection
+    {
+        $codes = array_merge($this->codeCandidates($query), $query->codes());
+        $subject = $query->subject(array_merge($triggers, $this->campWords($query)));
+        $named = ! ArabicText::isTooShort($subject, 2);
+
+        if ($codes === [] && ! $named) {
+            return new Collection;
+        }
+
+        return Household::query()
+            ->with('head')
+            ->withCount('members')
+            ->where(function ($inner) use ($codes, $subject, $named): void {
+                foreach ($codes as $code) {
+                    $inner->orWhereRaw(SearchExpression::lower('household_code').' like ?', ['%'.$code.'%']);
+                }
+
+                if ($named) {
+                    $inner->orWhereRaw(SearchExpression::lower('household_code').' like ?', ['%'.$subject.'%'])
+                        ->orWhereHas('head', fn ($head) => $head->where('search_text', 'like', '%'.$subject.'%'));
+                }
+            })
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * The checkpoint named in the question, matched the way camps are: the
+     * stored name folded and looked for inside the folded question, longest
+     * name first so "البوابة الشمالية" is not swallowed by "البوابة".
+     */
+    protected function checkpointIn(AssistantQuery $query): ?Checkpoint
+    {
+        return $this->namedRecord($query, Checkpoint::query()->with('camp')->orderBy('name')->get());
+    }
+
+    protected function organizationIn(AssistantQuery $query): ?Organization
+    {
+        return $this->namedRecord($query, Organization::query()->orderBy('name')->get());
+    }
+
+    /**
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Collection<int, TModel>  $records
+     * @return TModel|null
+     */
+    private function namedRecord(AssistantQuery $query, Collection $records)
+    {
+        if ($query->text === '') {
+            return null;
+        }
+
+        return $records
+            ->map(fn ($record) => [$record, ArabicText::normalize($record->name)])
+            ->filter(fn (array $pair) => $pair[1] !== '' && str_contains($query->text, $pair[1]))
+            ->sortByDesc(fn (array $pair) => mb_strlen($pair[1]))
+            ->map(fn (array $pair) => $pair[0])
+            ->first();
+    }
+
+    /**
+     * A named thing the register does not have.
+     *
+     * Same shape as `unknownCamp()`: say plainly that it is missing, then list
+     * what does exist, because the usual cause is a spelling the register does
+     * not share and the real names settle it in one step.
+     *
+     * The caller supplies both sentences rather than a noun to slot in: Arabic
+     * agreement runs through the verb and the adjective, so "لا توجد وحدة" and
+     * "لا يوجد مخيم" cannot be built from one template.
+     *
+     * @param  Collection<int, Model>  $existing
+     */
+    protected function unknownNamed(
+        string $intent,
+        string $missing,
+        string $listLead,
+        Collection $existing,
+        callable $describe
+    ): Answer {
+        if ($existing->isEmpty()) {
+            return Answer::empty($intent, $missing);
+        }
+
+        return Answer::empty($intent, $missing.' '.$listLead, $existing->map($describe)->values()->all());
     }
 
     protected function statusLabel(Refugee $refugee): string

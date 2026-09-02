@@ -47,6 +47,11 @@ final class AssistantQuery
         // Arabic conjugates for gender and number, and a form left off this list
         // survives into the extracted name and turns the search into nonsense.
         'يسكن', 'تسكن', 'يسكنون', 'يقيم', 'تقيم', 'يعيش', 'تعيش', 'ساكن', 'ساكنه',
+        // Qualifiers that describe the register rather than name anything in it.
+        // "كم عدد الأسر المسجلة" is a count, and reading "المسجلة" as a name
+        // turns it into a search for a household by that name.
+        'المسجلة', 'مسجلة', 'المسجلين', 'المسجلون', 'الحالية', 'الحالي', 'الموجودة',
+        'الموجود', 'المتاحة', 'لدينا', 'عندنا', 'النظام', 'الكل', 'جميع', 'كافة',
     ];
 
     public function __construct(string $raw)

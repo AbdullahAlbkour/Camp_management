@@ -2,15 +2,22 @@
 
 namespace App\Assistant;
 
+use App\Assistant\Intents\AidByOrganizationIntent;
+use App\Assistant\Intents\AidForHouseholdIntent;
 use App\Assistant\Intents\AidForRefugeeIntent;
 use App\Assistant\Intents\AidSummaryIntent;
+use App\Assistant\Intents\CheckpointTrafficIntent;
 use App\Assistant\Intents\HelpIntent;
 use App\Assistant\Intents\HouseholdIntent;
 use App\Assistant\Intents\HousingStatusIntent;
+use App\Assistant\Intents\LastMovementIntent;
+use App\Assistant\Intents\OrganizationsIntent;
 use App\Assistant\Intents\OverviewIntent;
 use App\Assistant\Intents\PopulationIntent;
+use App\Assistant\Intents\PresenceIntent;
 use App\Assistant\Intents\RefugeeLookupIntent;
 use App\Assistant\Intents\ShelterAvailabilityIntent;
+use App\Assistant\Intents\ShelterLookupIntent;
 use App\Assistant\Intents\UnhousedIntent;
 use App\Models\Camp;
 use App\Models\User;
@@ -30,17 +37,47 @@ class IntentRegistry
     private ?array $intents = null;
 
     /**
+     * The order questions are *offered* in, which is deliberately not the order
+     * they are resolved in.
+     *
+     * Resolution puts the narrow intents first so one wins a tie against the
+     * broad intent it shares trigger words with. The widget wants the opposite:
+     * six chips that span the areas a role can reach, led by the questions that
+     * read as invitations rather than as templates to fill in.
+     *
+     * @var list<string>
+     */
+    private const SUGGESTED_FIRST = [
+        'housing_status', 'population', 'shelter_availability', 'aid_summary',
+        'unhoused', 'household', 'presence', 'shelter_lookup', 'last_movement',
+        'checkpoint_traffic', 'aid_for_household', 'aid_by_organization',
+        'organizations', 'aid_for_refugee',
+    ];
+
+    /**
      * @return list<Intent>
      */
     public function all(): array
     {
         return $this->intents ??= [
             new HelpIntent(fn (User $user) => $this->examplesFor($user)),
+
+            // Questions naming one record come first: each of these shares its
+            // trigger words with a broader intent below, and would be swallowed
+            // by it at equal confidence.
+            new ShelterLookupIntent,
+            new PresenceIntent,
+            new LastMovementIntent,
+            new AidForHouseholdIntent,
+            new AidByOrganizationIntent,
+
             new HousingStatusIntent,
             new UnhousedIntent,
             new ShelterAvailabilityIntent,
+            new CheckpointTrafficIntent,
             new AidForRefugeeIntent,
             new AidSummaryIntent,
+            new OrganizationsIntent,
             new PopulationIntent,
             new HouseholdIntent,
             new OverviewIntent,
@@ -83,13 +120,31 @@ class IntentRegistry
         $camp = $this->sampleCampName();
         $examples = [];
 
-        foreach ($this->forUser($user) as $intent) {
+        foreach ($this->suggestionOrder($user) as $intent) {
             foreach ($intent->examples() as $example) {
                 $examples[] = str_replace('{camp}', $camp, $example);
             }
         }
 
         return array_slice(array_values(array_unique($examples)), 0, $limit);
+    }
+
+    /**
+     * The intents this user may reach, in the order their examples should be
+     * offered. Anything not named in SUGGESTED_FIRST keeps registry order,
+     * behind everything that is.
+     *
+     * @return list<Intent>
+     */
+    private function suggestionOrder(?User $user): array
+    {
+        $intents = $this->forUser($user);
+        $rank = array_flip(self::SUGGESTED_FIRST);
+        $last = count(self::SUGGESTED_FIRST);
+
+        usort($intents, fn (Intent $a, Intent $b) => ($rank[$a->name()] ?? $last) <=> ($rank[$b->name()] ?? $last));
+
+        return $intents;
     }
 
     /**
