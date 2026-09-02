@@ -6,9 +6,11 @@ use App\Models\Camp;
 use App\Models\Household;
 use App\Models\Refugee;
 use App\Models\Shelter;
+use Faker\Generator;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
+use RuntimeException;
 
 /**
  * Camp structure and a population of 200 refugees spread across it.
@@ -46,6 +48,8 @@ class CampStructureSeeder extends Seeder
 
     public function run(): void
     {
+        $this->guardFakerIsInstalled();
+
         // A fixed seed so two runs of the same code describe the same camp, and
         // a figure quoted from a screenshot still matches the database later.
         mt_srand(20260902);
@@ -78,6 +82,28 @@ class CampStructureSeeder extends Seeder
             $inFamily,
             self::REFUGEE_COUNT - $inFamily,
         ));
+    }
+
+    /**
+     * Stop with something readable when Faker is missing.
+     *
+     * Laravel's `Factory::withFaker()` returns null rather than throwing when
+     * the package is absent, so the first `$this->faker->...` in any factory
+     * fails as "Call to a member function on null" — which names neither the
+     * cause nor the cure. Faker is a runtime requirement of this application
+     * precisely because this seeder exists, so an install that skipped it is
+     * incomplete rather than merely missing a testing tool.
+     */
+    private function guardFakerIsInstalled(): void
+    {
+        if (class_exists(Generator::class)) {
+            return;
+        }
+
+        throw new RuntimeException(
+            'حزمة Faker غير مثبّتة، والبذرة تعتمد على الـ Factories التي تستخدمها. '
+            .'شغّل «composer install» بدون الخيار --no-dev، ثم أعد المحاولة.'
+        );
     }
 
     /**
