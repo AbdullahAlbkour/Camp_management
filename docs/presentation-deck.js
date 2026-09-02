@@ -1,25 +1,6 @@
 const pptxgen = require('pptxgenjs');
 const { icon } = require('./icons');
-
-// ---------- palette: petrol + sand, chosen for a humanitarian field system ----------
-const DARK  = '0A2E36';
-const DARK2 = '113E48';
-const TEAL  = '02717D';
-const SEA   = '00A896';
-const AMBER = 'E9A13B';
-const LIGHT = 'F5F8F8';
-const CARD  = 'FFFFFF';
-const INK   = '16292E';
-const MUTED = '5C7378';
-const WHITE = 'FFFFFF';
-const PALE  = 'BFD4D7';
-
-const F = 'Arial';
-const W = 13.333, H = 7.5, M = 0.6;
-
-// right-aligned RTL text defaults
-const rtl = (o) => Object.assign({ isTextBox: true, rtlMode: true, align: 'right', fontFace: F, margin: 0 }, o);
-const shadow = () => ({ type: 'outer', angle: 90, blur: 10, offset: 2, color: '0A2E36', opacity: 0.10 });
+const { P, F, MONO, W, H, M, ar, rtl, ltr, shadow } = require('./lib');
 
 const pres = new pptxgen();
 pres.layout = 'LAYOUT_WIDE';
@@ -27,96 +8,143 @@ pres.rtlMode = true;
 pres.author = 'Camp Management System';
 pres.title = 'نظام إدارة المخيمات';
 
-// title block shared by the light content slides
-function heading(s, text, kicker) {
-  if (kicker) {
-    s.addText(kicker, rtl({ x: M, y: 0.42, w: W - 2 * M, h: 0.3, fontSize: 13, bold: true, color: TEAL, charSpacing: 1 }));
-  }
-  s.addText(text, rtl({ x: M, y: kicker ? 0.76 : 0.5, w: W - 2 * M, h: 0.62, fontSize: 34, bold: true, color: INK }));
+const IC = {};
+// every add* that carries Arabic goes through ar() so the isolates are never forgotten
+const T = (s, text, o) => s.addText(ar(text), rtl(o));
+const TL = (s, text, o) => s.addText(text, ltr(o));
+const card = (s, x, y, w, h, fill) =>
+  s.addShape(pres.ShapeType.roundRect, { x, y, w, h, fill: { color: fill || P.CARD }, rectRadius: 0.09, shadow: fill && fill !== P.CARD ? undefined : shadow() });
+const dot = (s, x, y, d, fill) => s.addShape(pres.ShapeType.ellipse, { x, y, w: d, h: d, fill: { color: fill } });
+
+function heading(s, text, kicker, dark) {
+  T(s, kicker, { x: M, y: 0.42, w: W - 2 * M, h: 0.3, fontSize: 13, bold: true, color: dark ? P.AMBER : P.TEAL, charSpacing: 1 });
+  T(s, text, { x: M, y: 0.76, w: W - 2 * M, h: 0.62, fontSize: 33, bold: true, color: dark ? P.WHITE : P.INK });
+}
+// a numbered/iconed row used on several slides
+function rowCard(s, x, y, w, h, title, sub, accent, glyph, num) {
+  card(s, x, y, w, h);
+  dot(s, x + w - 0.86, y + h / 2 - 0.25, 0.5, accent);
+  if (glyph) s.addImage({ data: glyph, x: x + w - 0.73, y: y + h / 2 - 0.12, w: 0.24, h: 0.24 });
+  else T(s, String(num), { x: x + w - 0.86, y: y + h / 2 - 0.25, w: 0.5, h: 0.5, fontSize: 15, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+  T(s, title, { x: x + 0.25, y: y + 0.14, w: w - 1.2, h: 0.3, fontSize: 14, bold: true, color: P.INK });
+  T(s, sub, { x: x + 0.25, y: y + 0.46, w: w - 1.2, h: 0.3, fontSize: 11.5, color: P.MUTED });
 }
 
 async function build() {
-  const ic = {};
   const want = {
-    paper: 'FaFileAlt', copy: 'FaClone', house: 'FaHome', door: 'FaDoorOpen',
-    search: 'FaSearch', clock: 'FaHourglassHalf', user: 'FaUserPlus', box: 'FaBoxOpen',
-    med: 'FaBriefcaseMedical', chart: 'FaChartBar', shield: 'FaShieldAlt', bot: 'FaRobot',
-    check: 'FaCheck', arrow: 'FaArrowLeft', lang: 'FaLanguage', bolt: 'FaBolt',
+    paper: 'FaFileAlt', copy: 'FaClone', house: 'FaHome', door: 'FaDoorOpen', search: 'FaSearch',
+    clock: 'FaHourglassHalf', user: 'FaUserPlus', box: 'FaBoxOpen', med: 'FaBriefcaseMedical',
+    chart: 'FaChartBar', shield: 'FaShieldAlt', bot: 'FaRobot', check: 'FaCheck', arrow: 'FaArrowLeft',
+    lang: 'FaLanguage', bolt: 'FaBolt', layers: 'FaLayerGroup', db: 'FaDatabase', lock: 'FaLock',
+    vial: 'FaVial', bug: 'FaBug', code: 'FaCode', list: 'FaListOl', times: 'FaTimes',
   };
   for (const [k, v] of Object.entries(want)) {
-    ic[k + '_w'] = await icon(v, WHITE);
-    ic[k + '_t'] = await icon(v, TEAL);
-    ic[k + '_a'] = await icon(v, AMBER);
+    IC[k] = await icon(v, P.WHITE);
+    IC[k + '_t'] = await icon(v, P.TEAL);
   }
 
-  // ============================ 1. TITLE ============================
+  // ==================== 1. TITLE ====================
   {
     const s = pres.addSlide();
-    s.background = { color: DARK };
-    // quiet geometric motif, left side
-    s.addShape(pres.ShapeType.ellipse, { x: -1.5, y: 3.3, w: 5.2, h: 5.2, fill: { color: DARK2 } });
-    s.addShape(pres.ShapeType.ellipse, { x: 0.62, y: 1.62, w: 2.5, h: 2.5, fill: { color: TEAL } });
-    s.addImage({ data: ic.bot_w, x: 1.44, y: 2.44, w: 0.86, h: 0.86 });
+    s.background = { color: P.DARK };
+    s.addShape(pres.ShapeType.ellipse, { x: -1.5, y: 3.3, w: 5.2, h: 5.2, fill: { color: P.DARK2 } });
+    dot(s, 0.62, 1.62, 2.5, P.TEAL);
+    s.addImage({ data: IC.bot, x: 1.44, y: 2.44, w: 0.86, h: 0.86 });
 
-    s.addText('مشروع تخرّج', rtl({ x: 4.3, y: 1.35, w: W - 4.3 - M, h: 0.32, fontSize: 14, bold: true, color: SEA, charSpacing: 2 }));
-    s.addText('نظام إدارة المخيمات', rtl({ x: 4.3, y: 1.75, w: W - 4.3 - M, h: 0.95, fontSize: 46, bold: true, color: WHITE }));
-    s.addText('Camp Management System', { isTextBox: true, x: 4.3, y: 2.72, w: W - 4.3 - M, h: 0.4, fontSize: 19, color: PALE, align: 'right', fontFace: F, margin: 0 });
-    s.addText('نظام ويب متكامل لإدارة مخيمات اللجوء: التسجيل، السكن، المساعدات، وحركة الدخول والخروج',
-      rtl({ x: 4.3, y: 3.3, w: W - 4.3 - M, h: 0.4, fontSize: 14.5, color: PALE, lineSpacing: 22 }));
+    T(s, 'مشروع تخرّج', { x: 4.3, y: 1.35, w: W - 4.3 - M, h: 0.32, fontSize: 14, bold: true, color: P.SEA, charSpacing: 2 });
+    T(s, 'نظام إدارة المخيمات', { x: 4.3, y: 1.75, w: W - 4.3 - M, h: 0.95, fontSize: 46, bold: true, color: P.WHITE });
+    TL(s, 'Camp Management System', { x: 4.3, y: 2.72, w: W - 4.3 - M, h: 0.4, fontSize: 19, color: P.PALE, align: 'right' });
+    T(s, 'نظام ويب متكامل لإدارة مخيمات اللجوء: التسجيل، السكن، المساعدات، وحركة الدخول والخروج',
+      { x: 4.3, y: 3.3, w: W - 4.3 - M, h: 0.4, fontSize: 14.5, color: P.PALE, lineSpacing: 22 });
 
-    const chips = ['Laravel 12', 'MySQL 8', 'PHP 8.2'];
     let cx = W - M;
-    chips.forEach((c) => {
-      const cw = 1.62;
-      cx -= cw;
-      s.addShape(pres.ShapeType.roundRect, { x: cx, y: 4.0, w: cw, h: 0.46, fill: { color: DARK2 }, line: { color: TEAL, width: 1 }, rectRadius: 0.22 });
-      s.addText(c, { isTextBox: true, x: cx, y: 4.0, w: cw, h: 0.46, fontSize: 12.5, bold: true, color: SEA, align: 'center', valign: 'middle', fontFace: F, margin: 0 });
+    ['Laravel 12', 'MySQL 8', 'PHP 8.2'].forEach((c) => {
+      cx -= 1.62;
+      s.addShape(pres.ShapeType.roundRect, { x: cx, y: 4.0, w: 1.62, h: 0.46, fill: { color: P.DARK2 }, line: { color: P.TEAL, width: 1 }, rectRadius: 0.22 });
+      TL(s, c, { x: cx, y: 4.0, w: 1.62, h: 0.46, fontSize: 12.5, bold: true, color: P.SEA, align: 'center', valign: 'middle' });
       cx -= 0.18;
     });
 
-    s.addText([
-      { text: 'إعداد: ', options: { color: MUTED } }, { text: '[اسم الطالب]', options: { color: WHITE, bold: true } },
-      { text: '     |     إشراف: ', options: { color: MUTED } }, { text: '[اسم المشرف]', options: { color: WHITE, bold: true } },
-    ], rtl({ x: 4.3, y: 5.88, w: W - 4.3 - M, h: 0.3, fontSize: 13 }));
-    s.addText('[القسم]  —  [الجامعة]  —  [العام الدراسي]', rtl({ x: 4.3, y: 6.26, w: W - 4.3 - M, h: 0.3, fontSize: 12.5, color: MUTED }));
+    T(s, 'إعداد: [اسم الطالب]', { x: 4.3, y: 5.55, w: W - 4.3 - M, h: 0.32, fontSize: 14, bold: true, color: P.WHITE });
+    T(s, 'إشراف: [اسم المشرف]', { x: 4.3, y: 5.95, w: W - 4.3 - M, h: 0.32, fontSize: 13, color: P.PALE });
+    T(s, '[القسم] — [الجامعة] — [العام الدراسي]', { x: 4.3, y: 6.35, w: W - 4.3 - M, h: 0.3, fontSize: 12.5, color: P.MUTED });
 
     s.addNotes(`السلام عليكم ورحمة الله وبركاته. أعضاء لجنة التحكيم الموقّرة، أساتذتي الكرام، أشكركم على وقتكم وحضوركم.
 
 اسمي [الاسم]، وأقدّم اليوم مشروع تخرجي بعنوان «نظام إدارة المخيمات»، وهو نظام ويب متكامل بُني بإطار عمل Laravel لإدارة العمليات اليومية داخل مخيمات اللجوء: من تسجيل اللاجئ لحظة وصوله، إلى تخصيص وحدته السكنية، وتوزيع المساعدات عليه، وتتبّع حركة دخوله وخروجه عبر البوابات.
 
-سأعرض عليكم في الدقائق القادمة أربعة محاور: المشكلة التي دفعتني لاختيار الموضوع، ثم الحل والبنية التقنية، ثم الميزة البرمجية الأهم في المشروع وهي المساعد الذكي، وأخيرًا كيف عالجت الحالات الاستثنائية التي تكسر الأنظمة عادةً — وهي النقطة التي أتمنى أن تنالوا منها انطباعًا عن جدّية الهندسة خلف المشروع، لا عن عدد الشاشات فيه فقط.
+المشروع ليس واجهات فقط: خلفه قاعدة بيانات من ثمانية عشر جدولًا، وسبعة أدوار بصلاحيات دقيقة، ومساعد ذكي يجيب بالعربية، ومجموعة اختبارات آلية من 284 اختبارًا تعمل عند كل تعديل.
 
-ولنبدأ بالسؤال الأول: لماذا هذا المشروع أصلًا؟
+سأعرض عليكم البنية أولًا، ثم الوظائف، ثم الميزة البرمجية الأهم وهي المساعد الذكي، ثم كيف عالجت الحالات الاستثنائية وكيف أثبتّ ذلك بالاختبار.
 
 [أداء] لا تقرأ الشريحة. انظر إلى اللجنة، وابتسم، وتنفّس قبل أن تبدأ. الزمن: 45 ثانية.`);
   }
 
-  // ============================ 2. PROBLEM ============================
+  // ==================== 2. AGENDA ====================
   {
     const s = pres.addSlide();
-    s.background = { color: LIGHT };
-    heading(s, 'أين تكمن المشكلة؟', 'الفصل الأول  ·  المشكلة');
+    s.background = { color: P.LIGHT };
+    heading(s, 'محاور العرض', 'خريطة الطريق');
+    const parts = [
+      ['١', 'الإطار', 'المشكلة، الحل المقترح، وأهداف النظام', P.TEAL],
+      ['٢', 'البناء', 'التقنيات، المعمارية، وتصميم قاعدة البيانات', P.TEAL],
+      ['٣', 'الوظائف', 'الوحدات الست ونظام الصلاحيات', P.TEAL],
+      ['٤', 'الابتكار', 'المساعد الذكي ومحرّك تحليل النوايا', P.AMBER],
+      ['٥', 'المتانة', 'التدهور الآمن ومعالجة الاستثناءات', P.AMBER],
+      ['٦', 'البرهان', 'الاختبار الآلي وضمان الجودة', P.AMBER],
+    ];
+    const cw = (W - 2 * M - 0.4) / 2, ch = 1.42;
+    parts.forEach((p, i) => {
+      const col = i % 2, row = Math.floor(i / 2);
+      const x = col === 0 ? W - M - cw : M;
+      const y = 1.78 + row * (ch + 0.3);
+      card(s, x, y, cw, ch);
+      dot(s, x + cw - 1.05, y + 0.38, 0.66, p[3]);
+      T(s, p[0], { x: x + cw - 1.05, y: y + 0.38, w: 0.66, h: 0.66, fontSize: 22, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+      T(s, p[1], { x: x + 0.28, y: y + 0.36, w: cw - 1.5, h: 0.34, fontSize: 16, bold: true, color: P.INK });
+      T(s, p[2], { x: x + 0.28, y: y + 0.76, w: cw - 1.5, h: 0.4, fontSize: 11.5, color: P.MUTED, lineSpacing: 15 });
+    });
+    s.addNotes(`العرض في ستة محاور.
 
+أبدأ بالإطار: ما المشكلة في الإدارة التقليدية للمخيمات، وما الحل الذي أقترحه وأهدافه.
+
+ثم البناء: التقنيات التي اخترتها ولماذا، ومعمارية النظام بطبقاتها، وتصميم قاعدة البيانات.
+
+ثم الوظائف: الوحدات الست التي يغطيها النظام، ونظام الصلاحيات الذي يحكم من يرى ماذا.
+
+ثم الابتكار، وهو ما أعتبره نقطة قوة المشروع: المساعد الذكي الذي يجيب عن سؤال مكتوب بالعربية، ومحرّك تحليل النوايا الذي يقف خلفه.
+
+ثم المتانة: كيف يتصرّف النظام حين تسوء الأمور — اسم ملتبس، مخيم غير موجود، خطأ غير متوقع.
+
+وأختم بالبرهان: الاختبارات الآلية التي تثبت أن كل ما قلته يعمل فعلًا، لا أنه مجرد ادّعاء في عرض تقديمي.
+
+[أداء] هذه الشريحة تستغرق 40 ثانية. لا تشرح المحاور، فقط اذكرها ليعرف الحاضر أين هو من العرض.`);
+  }
+
+  // ==================== 3. PROBLEM ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.LIGHT };
+    heading(s, 'أين تكمن المشكلة؟', 'المحور الأول · المشكلة');
     const items = [
-      [ic.paper_w, 'سجلات ورقية متفرّقة', 'كل قسم لديه نسخته، ولا مصدر واحد للحقيقة', TEAL],
-      [ic.copy_w, 'ازدواجية وتكرار', 'شخص يستلم المساعدة مرتين، وآخر لا يستلمها', TEAL],
-      [ic.house_w, 'الطاقة الاستيعابية غير مضبوطة', 'خيمة سعتها خمسة يسكنها ثمانية', TEAL],
-      [ic.door_w, 'حركة الدخول والخروج', 'سؤال «من الموجود داخل المخيم الآن؟» بلا إجابة', AMBER],
-      [ic.search_w, 'البحث بالاسم العربي يفشل', '«احمد» و«أحمد» سجلّان مختلفان، فتُولد الازدواجية', AMBER],
-      [ic.clock_w, 'الاستعلام يحتاج ساعات', 'موظف يبحث يدويًا في ملفات متفرقة', TEAL],
+      [IC.paper, 'سجلات ورقية متفرّقة', 'كل قسم لديه نسخته، ولا مصدر واحد للحقيقة', P.TEAL],
+      [IC.copy, 'ازدواجية وتكرار', 'شخص يستلم المساعدة مرتين، وآخر لا يستلمها', P.TEAL],
+      [IC.house, 'الطاقة الاستيعابية غير مضبوطة', 'خيمة سعتها خمسة يسكنها ثمانية', P.TEAL],
+      [IC.door, 'حركة الدخول والخروج', 'سؤال «من الموجود داخل المخيم الآن؟» بلا إجابة', P.AMBER],
+      [IC.search, 'البحث بالاسم العربي يفشل', '«احمد» و«أحمد» سجلّان مختلفان، فتُولد الازدواجية', P.AMBER],
+      [IC.clock, 'الاستعلام يحتاج ساعات', 'موظف يبحث يدويًا في ملفات متفرقة', P.TEAL],
     ];
     const cw = (W - 2 * M - 0.36) / 2, ch = 1.5;
     items.forEach((it, i) => {
       const col = i % 2, row = Math.floor(i / 2);
-      const x = col === 0 ? W - M - cw : M;              // RTL: first item on the right
+      const x = col === 0 ? W - M - cw : M;
       const y = 1.72 + row * (ch + 0.28);
-      s.addShape(pres.ShapeType.roundRect, { x, y, w: cw, h: ch, fill: { color: CARD }, rectRadius: 0.1, shadow: shadow() });
-      s.addShape(pres.ShapeType.ellipse, { x: x + cw - 1.07, y: y + 0.38, w: 0.74, h: 0.74, fill: { color: it[3] } });
+      card(s, x, y, cw, ch);
+      dot(s, x + cw - 1.07, y + 0.38, 0.74, it[3]);
       s.addImage({ data: it[0], x: x + cw - 0.89, y: y + 0.56, w: 0.38, h: 0.38 });
-      s.addText(it[1], rtl({ x: x + 0.28, y: y + 0.37, w: cw - 1.5, h: 0.36, fontSize: 15, bold: true, color: INK }));
-      s.addText(it[2], rtl({ x: x + 0.28, y: y + 0.79, w: cw - 1.5, h: 0.44, fontSize: 11.5, color: MUTED, lineSpacing: 15 }));
+      T(s, it[1], { x: x + 0.28, y: y + 0.37, w: cw - 1.5, h: 0.36, fontSize: 15, bold: true, color: P.INK });
+      T(s, it[2], { x: x + 0.28, y: y + 0.79, w: cw - 1.5, h: 0.44, fontSize: 11.5, color: P.MUTED, lineSpacing: 15 });
     });
-
     s.addNotes(`في كثير من المخيمات، تُدار البيانات حتى اليوم بالورق أو بملفات Excel متفرقة، يحتفظ كل قسم بنسخته الخاصة منها. والنتيجة مشاكل متسلسلة:
 
 أولًا: لا يوجد مصدر واحد للحقيقة. قسم التسجيل لديه قائمة، وقسم المساعدات قائمة أخرى، وقسم السكن ثالثة. فإذا انتقلت أسرة من خيمة إلى أخرى، تُحدَّث قائمة واحدة وتبقى البقية قديمة. وهنا تبدأ الازدواجية: شخص يستلم المساعدة مرتين، وآخر لا يستلمها أبدًا.
@@ -129,333 +157,613 @@ async function build() {
 
 والخلاصة: المشكلة ليست نقص البيانات، بل أن البيانات موجودة ولا يمكن الوصول إليها في الوقت المناسب.
 
-[أداء] قف عند نقطة «احمد ≠ أحمد» ثانيتين — ستعود في الشريحة السابعة كإجابة. الزمن: 1.5 دقيقة.`);
+[أداء] قف عند نقطة «احمد ≠ أحمد» ثانيتين — ستعود لاحقًا كإجابة. الزمن: 1.5 دقيقة.`);
   }
 
-  // ============================ 3. SOLUTION ============================
+  // ==================== 4. SOLUTION ====================
   {
     const s = pres.addSlide();
-    s.background = { color: LIGHT };
-    heading(s, 'الحل المقترح وأهداف النظام', 'الفصل الثاني  ·  الحل');
-
+    s.background = { color: P.LIGHT };
+    heading(s, 'الحل المقترح وأهداف النظام', 'المحور الأول · الحل');
     const goals = [
       ['مصدر واحد للحقيقة', 'قاعدة بيانات علائقية مترابطة تقرأ منها كل الأقسام'],
       ['منع الخطأ لا تسجيله', 'النظام يرفض تجاوز سعة الوحدة السكنية ابتداءً'],
-      ['صلاحيات دقيقة', '٧ أدوار وظيفية، كل دور يرى ما يخصّه فقط'],
+      ['صلاحيات دقيقة', 'سبعة أدوار وظيفية، كل دور يرى ما يخصّه فقط'],
       ['تتبّع كامل', 'سجل تدقيق يوثّق من فعل وماذا فعل ومتى'],
       ['وصول فوري للمعلومة', 'مساعد ذكي يجيب عن السؤال المكتوب بالعربية'],
     ];
     const bw = 7.5, bx = W - M - bw, bh = 0.86;
     goals.forEach((g, i) => {
       const y = 1.72 + i * (bh + 0.16);
-      s.addShape(pres.ShapeType.roundRect, { x: bx, y, w: bw, h: bh, fill: { color: CARD }, rectRadius: 0.08, shadow: shadow() });
-      s.addShape(pres.ShapeType.ellipse, { x: bx + bw - 0.83, y: y + 0.19, w: 0.48, h: 0.48, fill: { color: i === 4 ? AMBER : TEAL } });
-      s.addText(String(i + 1), { isTextBox: true, x: bx + bw - 0.83, y: y + 0.19, w: 0.48, h: 0.48, fontSize: 15, bold: true, color: WHITE, align: 'center', valign: 'middle', fontFace: F, margin: 0 });
-      s.addText(g[0], rtl({ x: bx + 0.25, y: y + 0.13, w: bw - 1.2, h: 0.3, fontSize: 14.5, bold: true, color: INK }));
-      s.addText(g[1], rtl({ x: bx + 0.25, y: y + 0.46, w: bw - 1.2, h: 0.28, fontSize: 11.5, color: MUTED }));
+      rowCard(s, bx, y, bw, bh, g[0], g[1], i === 4 ? P.AMBER : P.TEAL, null, i + 1);
     });
-
-    // philosophy callout, left
     const px = M, pw = W - 2 * M - bw - 0.4;
-    s.addShape(pres.ShapeType.roundRect, { x: px, y: 1.72, w: pw, h: 4.94, fill: { color: DARK }, rectRadius: 0.12 });
-    s.addShape(pres.ShapeType.ellipse, { x: px + pw / 2 - 0.45, y: 2.28, w: 0.9, h: 0.9, fill: { color: TEAL } });
-    s.addImage({ data: ic.shield_w, x: px + pw / 2 - 0.24, y: 2.49, w: 0.48, h: 0.48 });
-    s.addText('فلسفة التصميم', { isTextBox: true, x: px + 0.3, y: 3.42, w: pw - 0.6, h: 0.3, fontSize: 12.5, bold: true, color: SEA, align: 'center', fontFace: F, rtlMode: true, margin: 0 });
-    s.addText('النظام يمنع الخطأ\nقبل وقوعه،\nولا يكتفي بتسجيله.', { isTextBox: true, x: px + 0.3, y: 3.86, w: pw - 0.6, h: 1.5, fontSize: 20, bold: true, color: WHITE, align: 'center', fontFace: F, rtlMode: true, lineSpacing: 32, margin: 0 });
-    s.addText('قواعد العمل في طبقة الخدمات،\nلا في الواجهة، لأن الواجهة\nيمكن تجاوزها والخدمة لا.', { isTextBox: true, x: px + 0.3, y: 5.5, w: pw - 0.6, h: 0.9, fontSize: 11.5, color: PALE, align: 'center', fontFace: F, rtlMode: true, lineSpacing: 17, margin: 0 });
+    s.addShape(pres.ShapeType.roundRect, { x: px, y: 1.72, w: pw, h: 4.94, fill: { color: P.DARK }, rectRadius: 0.12 });
+    dot(s, px + pw / 2 - 0.45, 2.28, 0.9, P.TEAL);
+    s.addImage({ data: IC.shield, x: px + pw / 2 - 0.24, y: 2.49, w: 0.48, h: 0.48 });
+    T(s, 'فلسفة التصميم', { x: px + 0.3, y: 3.42, w: pw - 0.6, h: 0.3, fontSize: 12.5, bold: true, color: P.SEA, align: 'center' });
+    T(s, 'النظام يمنع الخطأ\nقبل وقوعه،\nولا يكتفي بتسجيله.', { x: px + 0.3, y: 3.86, w: pw - 0.6, h: 1.5, fontSize: 20, bold: true, color: P.WHITE, align: 'center', lineSpacing: 32 });
+    T(s, 'قواعد العمل في طبقة الخدمات،\nلا في الواجهة، لأن الواجهة\nيمكن تجاوزها والخدمة لا.', { x: px + 0.3, y: 5.5, w: pw - 0.6, h: 0.9, fontSize: 11.5, color: P.PALE, align: 'center', lineSpacing: 17 });
+    s.addNotes(`الحل الذي بنيته نظام ويب مركزي واحد تعمل عليه جميع الأقسام في الوقت نفسه، وتُبنى عليه خمسة أهداف:
 
-    s.addNotes(`الحل الذي بنيته هو نظام ويب مركزي واحد، تعمل عليه جميع الأقسام في الوقت نفسه، وتُبنى عليه خمسة أهداف:
+الأول: مصدر واحد للحقيقة. قاعدة بيانات علائقية واحدة مترابطة بمفاتيح أجنبية حقيقية. فحين يُنقل لاجئ من وحدة إلى أخرى، يراه قسم المساعدات وقسم الأمن في اللحظة نفسها.
 
-الهدف الأول: مصدر واحد للحقيقة. قاعدة بيانات علائقية واحدة، مترابطة بمفاتيح أجنبية حقيقية. فحين يُنقل لاجئ من وحدة إلى أخرى، يراه قسم المساعدات وقسم الأمن في اللحظة نفسها، لأن الجميع يقرأ من الجدول نفسه.
+الثاني: منع الخطأ لا تسجيله — وهذه نقطة تصميمية أودّ التوقف عندها. عند نقل لاجئ إلى وحدة، يحسب النظام الإشغال الحالي ويقارنه بالسعة، فإن كانت ممتلئة يرفض العملية ويعرض السبب. لا يسجّل التجاوز ثم ينبّه لاحقًا — يمنعه ابتداءً. والقاعدة في طبقة الخدمات لا في الواجهة، لأن الواجهة يمكن تجاوزها والخدمة لا. وهذا هو معنى العبارة على يسار الشريحة.
 
-الهدف الثاني: منع الخطأ لا تسجيله فقط — وهذه نقطة تصميمية أودّ التوقف عندها. مثال عملي: عند نقل لاجئ إلى وحدة سكنية، يحسب النظام الإشغال الحالي ويقارنه بالسعة، فإن كانت ممتلئة يرفض العملية ويعرض رسالة توضح السبب. لا يسجّل التجاوز ثم ينبّه عليه لاحقًا — يمنعه ابتداءً. والقاعدة في طبقة الخدمات لا في الواجهة، لأن الواجهة يمكن تجاوزها والخدمة لا.
+الثالث: صلاحيات دقيقة حسب الدور — سبعة أدوار، وسأخصّص لها شريحة كاملة.
 
-الهدف الثالث: صلاحيات دقيقة حسب الدور. سبعة أدوار: مدير النظام، المدير، موظف التسجيل، موظف السكن، موظف المساعدات، الموظف الطبي، وضابط الأمن. وكل دور يرى ما يخصّه فقط — الموظف الطبي لا يرى أرقام المساعدات، وموظف المساعدات لا يرى التشخيصات الطبية. وهذا ليس إخفاءً في الواجهة، بل منعٌ في طبقة الصلاحيات نفسها.
+الرابع: سجل تدقيق كامل. كل عملية حسّاسة تُكتب في سجل يحفظ من فعل وماذا فعل ومتى وعلى أي سجل. فالمساءلة ممكنة، وهذا مطلب أساسي في أي نظام يتعامل مع بيانات بشر.
 
-الهدف الرابع: سجل تدقيق كامل. كل عملية حسّاسة — تسجيل، نقل، توزيع، حركة دخول — تُكتب في سجل يحفظ من فعل وماذا فعل ومتى وعلى أي سجل. فالمساءلة ممكنة، وهذا مطلب أساسي في أي نظام يتعامل مع بيانات بشر.
-
-والهدف الخامس هو ما سأخصّص له شريحة كاملة: أن يصل المستخدم إلى المعلومة بسؤال مباشر بالعربية، دون أن يتعلّم أين تقع كل شاشة.
+والخامس: أن يصل المستخدم إلى المعلومة بسؤال مباشر بالعربية دون أن يتعلّم أين تقع كل شاشة.
 
 الزمن: 1.5 دقيقة.`);
   }
 
-  // ============================ 4. TECH ============================
+  // ==================== 5. TECH ====================
   {
     const s = pres.addSlide();
-    s.background = { color: LIGHT };
-    heading(s, 'التقنيات وبيئة التطوير', 'الفصل الثالث  ·  البنية التقنية');
-
+    s.background = { color: P.LIGHT };
+    heading(s, 'التقنيات وبيئة التطوير', 'المحور الثاني · البناء');
     const rows = [
       ['إطار العمل', 'Laravel 12  ·  PHP 8.2'],
       ['قاعدة البيانات', 'MySQL 8  ·  Eloquent ORM'],
-      ['الواجهة', 'Blade  ·  RTL  ·  بلا خطوة بناء'],
-      ['بيئة التطوير', 'XAMPP  (Apache + MySQL + PHP)'],
+      ['الواجهة', 'Blade  ·  RTL  ·  no build step'],
+      ['بيئة التطوير', 'XAMPP  ·  Apache + MySQL + PHP'],
       ['إدارة الأكواد', 'Git  ·  GitHub  ·  GitHub Actions'],
     ];
     const tw = 6.9, tx = W - M - tw, rh = 0.84;
     rows.forEach((r, i) => {
       const y = 1.72 + i * (rh + 0.14);
-      s.addShape(pres.ShapeType.roundRect, { x: tx, y, w: tw, h: rh, fill: { color: CARD }, rectRadius: 0.08, shadow: shadow() });
-      s.addText(r[0], rtl({ x: tx + tw - 2.35, y: y + 0.24, w: 2.05, h: 0.36, fontSize: 14, bold: true, color: TEAL }));
-      s.addText(r[1], { isTextBox: true, x: tx + 0.3, y: y + 0.26, w: tw - 2.85, h: 0.34, fontSize: 13, color: INK, align: 'left', fontFace: F, margin: 0 });
+      card(s, tx, y, tw, rh);
+      T(s, r[0], { x: tx + tw - 2.35, y: y + 0.24, w: 2.05, h: 0.36, fontSize: 14, bold: true, color: P.TEAL });
+      TL(s, r[1], { x: tx + 0.3, y: y + 0.26, w: tw - 2.85, h: 0.34, fontSize: 13, color: P.INK });
     });
-
-    // stat grid, left
-    const stats = [['262', 'اختبارًا آليًا', AMBER], ['18', 'جدولًا مترابطًا', TEAL], ['12', 'خدمة مستقلة', TEAL], ['13,500', 'سطر برمجي', TEAL]];
+    const stats = [['284', 'اختبارًا آليًا', P.AMBER, true], ['18', 'جدولًا مترابطًا', P.TEAL], ['12', 'خدمة مستقلة', P.TEAL], ['13,500', 'سطر برمجي', P.TEAL]];
     const sw = (W - 2 * M - tw - 0.4 - 0.22) / 2, sh = 1.5;
     stats.forEach((st, i) => {
       const col = i % 2, row = Math.floor(i / 2);
       const x = col === 0 ? M + sw + 0.22 : M;
       const y = 1.72 + row * (sh + 0.25);
-      s.addShape(pres.ShapeType.roundRect, { x, y, w: sw, h: sh, fill: { color: i === 0 ? DARK : CARD }, rectRadius: 0.1, shadow: shadow() });
-      s.addText(st[0], { isTextBox: true, x, y: y + 0.3, w: sw, h: 0.62, fontSize: 34, bold: true, color: i === 0 ? AMBER : TEAL, align: 'center', fontFace: F, margin: 0 });
-      s.addText(st[1], { isTextBox: true, x, y: y + 0.96, w: sw, h: 0.3, fontSize: 12, color: i === 0 ? PALE : MUTED, align: 'center', fontFace: F, rtlMode: true, margin: 0 });
+      card(s, x, y, sw, sh, st[3] ? P.DARK : P.CARD);
+      TL(s, st[0], { x, y: y + 0.3, w: sw, h: 0.62, fontSize: 34, bold: true, color: st[3] ? P.AMBER : P.TEAL, align: 'center' });
+      T(s, st[1], { x, y: y + 0.96, w: sw, h: 0.3, fontSize: 12, color: st[3] ? P.PALE : P.MUTED, align: 'center' });
     });
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.2, w: sw * 2 + 0.22, h: 1.42, fill: { color: CARD }, rectRadius: 0.1, shadow: shadow() });
-    s.addShape(pres.ShapeType.ellipse, { x: M + sw * 2 + 0.22 - 0.78, y: 5.62, w: 0.52, h: 0.52, fill: { color: SEA } });
-    s.addImage({ data: ic.check_w, x: M + sw * 2 + 0.22 - 0.64, y: 5.76, w: 0.24, h: 0.24 });
-    s.addText('تكامل مستمر (CI)', rtl({ x: M + 0.25, y: 5.58, w: sw * 2 + 0.22 - 1.15, h: 0.3, fontSize: 13, bold: true, color: INK }));
-    s.addText('الاختبارات وفحص التنسيق تعمل آليًا عند كل رفع', rtl({ x: M + 0.25, y: 5.94, w: sw * 2 + 0.22 - 1.15, h: 0.44, fontSize: 11, color: MUTED, lineSpacing: 15 }));
-
+    card(s, M, 5.2, sw * 2 + 0.22, 1.42);
+    dot(s, M + sw * 2 + 0.22 - 0.78, 5.62, 0.52, P.SEA);
+    s.addImage({ data: IC.check, x: M + sw * 2 + 0.22 - 0.64, y: 5.76, w: 0.24, h: 0.24 });
+    T(s, 'تكامل مستمر', { x: M + 0.25, y: 5.58, w: sw * 2 + 0.22 - 1.15, h: 0.3, fontSize: 13, bold: true, color: P.INK });
+    T(s, 'الاختبارات تعمل آليًا على GitHub Actions عند كل رفع', { x: M + 0.25, y: 5.94, w: sw * 2 + 0.22 - 1.15, h: 0.44, fontSize: 11, color: P.MUTED, lineSpacing: 15 });
     s.addNotes(`أنتقل إلى البنية التقنية، وسأشرح لماذا اخترت كل تقنية لا ما هي فقط.
 
-إطار العمل: Laravel 12 على PHP 8.2. اخترته لثلاثة أسباب عملية: نظام الترحيلات (Migrations) الذي يجعل بنية قاعدة البيانات جزءًا من الكود ويمكن إعادة بناؤها بأمر واحد؛ وطبقة Eloquent التي تستخدم الاستعلامات المُعدّة (Prepared Statements) افتراضيًا فتغلق باب حقن SQL؛ ونظام الطبقات الذي سمح لي بفصل منطق العمل في 12 خدمة مستقلة عن المتحكّمات.
+إطار العمل: Laravel 12 على PHP 8.2. اخترته لثلاثة أسباب عملية: نظام الترحيلات الذي يجعل بنية قاعدة البيانات جزءًا من الكود ويمكن إعادة بناؤها بأمر واحد؛ وطبقة Eloquent التي تستخدم الاستعلامات المُعدّة افتراضيًا فتغلق باب حقن SQL؛ ونظام الطبقات الذي سمح لي بفصل منطق العمل في اثنتي عشرة خدمة مستقلة عن المتحكّمات.
 
-قاعدة البيانات: MySQL 8 بثمانية عشر جدولًا مترابطًا. وحرصت أن تكون القيود في قاعدة البيانات نفسها: مفاتيح أجنبية، وقيود فريدة، وفهارس مركّبة على أعمدة البحث المتكرر. فحتى لو أخطأ الكود يومًا، قاعدة البيانات ترفض البيانات المتناقضة.
+قاعدة البيانات: MySQL 8 بثمانية عشر جدولًا مترابطًا، والقيود في قاعدة البيانات نفسها: مفاتيح أجنبية، وقيود فريدة، وفهارس مركّبة. فحتى لو أخطأ الكود يومًا، قاعدة البيانات ترفض البيانات المتناقضة.
 
-الواجهة: Blade مع CSS وJavaScript عاديين، بلا أي خطوة بناء (build step). وهذا قرار مقصود: النظام مُوجَّه لبيئات محدودة الموارد والاتصال، ووجود عملية بناء معقّدة يجعل النشر والصيانة أصعب على فريق ميداني. والواجهة كاملة بالعربية واتجاه RTL.
+الواجهة: Blade مع CSS وJavaScript عاديين، بلا أي خطوة بناء. قرار مقصود: النظام مُوجَّه لبيئات محدودة الموارد والاتصال، ووجود عملية بناء معقّدة يجعل النشر والصيانة أصعب على فريق ميداني.
 
 بيئة التطوير: XAMPP التي توفّر Apache وMySQL وPHP في حزمة واحدة، وهي الأنسب للتطوير المحلي والتشغيل التجريبي. وأضفت أيضًا ملف Docker Compose في المستودع كخيار بديل.
 
-وإدارة الأكواد: Git وGitHub — لا كمخزن للنسخ فقط، بل بمنهجية فروع ومراجعة عبر طلبات دمج، مع تكامل مستمر عبر GitHub Actions يفحص تنسيق الكود ويشغّل جميع الاختبارات آليًا عند كل رفع.
+وإدارة الأكواد: Git وGitHub — لا كمخزن للنسخ فقط، بل بمنهجية فروع ومراجعة عبر طلبات دمج، مع تكامل مستمر عبر GitHub Actions يفحص التنسيق ويشغّل الاختبارات آليًا عند كل رفع.
 
-وأخيرًا الرقم الذي أعتز به: النظام مغطّى بـ 262 اختبارًا آليًا موزّعة على 28 ملفًا. فحين أعدّل في الكود، الاختبارات هي التي تخبرني إن كنت قد كسرت شيئًا — لا المستخدم بعد النشر.
+والأرقام على اليسار: 284 اختبارًا، 18 جدولًا، 12 خدمة، نحو 13,500 سطر.
 
-[أداء] قل رقم «262» ببطء ووضوح — اللجان تلتقطه لأنه دليل انضباط لا يُدّعى بالكلام. الزمن: 1.5 دقيقة.`);
+الزمن: 1.5 دقيقة.`);
   }
 
-  // ============================ 5. MODULES ============================
+  // ==================== 6. ARCHITECTURE ====================
   {
     const s = pres.addSlide();
-    s.background = { color: LIGHT };
-    heading(s, 'الوحدات الأساسية للنظام', 'الفصل الرابع  ·  الوظائف');
+    s.background = { color: P.LIGHT };
+    heading(s, 'معمارية النظام', 'المحور الثاني · البناء');
+    const layers = [
+      ['المتصفح', 'طلب من موظف مسجَّل الدخول', P.MUTED],
+      ['المسارات والوسائط', 'التحقق من الجلسة ومن دور المستخدم', P.TEAL],
+      ['طلبات التحقق', 'خمسة عشر صنفًا تتحقق من صحة المدخلات', P.TEAL],
+      ['المتحكّمات', 'ثلاثة وعشرون متحكّمًا تنسّق الطلب فقط', P.TEAL],
+      ['الخدمات', 'اثنتا عشرة خدمة فيها منطق العمل والمعاملات', P.AMBER],
+      ['النماذج وقاعدة البيانات', 'ثمانية عشر نموذجًا فوق MySQL', P.TEAL],
+    ];
+    const lw = 7.2, lx = W - M - lw, lh = 0.72;
+    layers.forEach((l, i) => {
+      const y = 1.72 + i * (lh + 0.13);
+      card(s, lx, y, lw, lh, l[2] === P.AMBER ? P.TINT_A : P.CARD);
+      dot(s, lx + lw - 0.62, y + 0.19, 0.34, l[2]);
+      T(s, String(i + 1), { x: lx + lw - 0.62, y: y + 0.19, w: 0.34, h: 0.34, fontSize: 12, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+      T(s, l[0], { x: lx + 0.25, y: y + 0.1, w: lw - 1.0, h: 0.28, fontSize: 13.5, bold: true, color: P.INK });
+      T(s, l[1], { x: lx + 0.25, y: y + 0.4, w: lw - 1.0, h: 0.26, fontSize: 11, color: P.MUTED });
+      if (i < layers.length - 1) s.addImage({ data: IC.arrow_t, x: lx + lw / 2, y: y + lh + 0.005, w: 0.12, h: 0.12, rotate: 270 });
+    });
+    const nx = M, nw = W - 2 * M - lw - 0.4;
+    s.addShape(pres.ShapeType.roundRect, { x: nx, y: 1.72, w: nw, h: 2.35, fill: { color: P.DARK }, rectRadius: 0.1 });
+    T(s, 'لماذا طبقة خدمات؟', { x: nx + 0.28, y: 1.95, w: nw - 0.56, h: 0.3, fontSize: 14, bold: true, color: P.SEA });
+    T(s, 'المتحكّم ينسّق الطلب ولا يقرّر. القاعدة التي تمنع تجاوز سعة الوحدة تعيش في الخدمة، فتسري على كل نقطة دخول: الشاشة، والنقل الجماعي للأسرة، والاختبار.',
+      { x: nx + 0.28, y: 2.35, w: nw - 0.56, h: 1.5, fontSize: 11.5, color: P.PALE, lineSpacing: 18 });
+    card(s, nx, 4.25, nw, 2.41);
+    T(s, 'ضمانات عابرة للطبقات', { x: nx + 0.28, y: 4.48, w: nw - 0.56, h: 0.3, fontSize: 13, bold: true, color: P.INK });
+    ['معاملة قاعدة بيانات لكل عملية مركّبة', 'قفل على مستوى الصف يمنع التسابق', 'سجل تدقيق يُكتب داخل المعاملة', 'حذف ناعم في تسعة نماذج'].forEach((t, i) => {
+      const y = 4.88 + i * 0.42;
+      dot(s, nx + nw - 0.52, y + 0.07, 0.16, P.SEA);
+      T(s, t, { x: nx + 0.28, y, w: nw - 0.9, h: 0.3, fontSize: 11, color: P.MUTED });
+    });
+    s.addNotes(`هذه معمارية النظام من الطلب حتى قاعدة البيانات، وهي معمارية طبقية كلاسيكية بإضافة واحدة مقصودة.
 
+الطلب يصل من المتصفح، فيمرّ أولًا على المسارات والوسائط: هناك يُتحقَّق أن المستخدم مسجّل الدخول وأن دوره يسمح له بهذا المسار. ثم على طلبات التحقق — خمسة عشر صنفًا مسؤولًا عن التأكد أن المدخلات صحيحة قبل أن تصل إلى أي منطق. ثم إلى المتحكّمات، وهي ثلاثة وعشرون متحكّمًا.
+
+وهنا الإضافة التي أودّ التوقف عندها: المتحكّم عندي لا يحتوي منطق عمل. مهمته أن يستقبل الطلب ويسلّمه إلى خدمة، ثم يعيد النتيجة. منطق العمل كله في اثنتي عشرة خدمة مستقلة.
+
+ولماذا؟ لأن القاعدة التي تمنع تجاوز سعة الوحدة السكنية يجب أن تسري على كل طريق يؤدي إلى النقل: شاشة النقل الفردي، ونقل الأسرة كاملة، وأي أمر مستقبلي. لو كتبتها في المتحكّم لاحتجت نسخها في كل نقطة دخول، ولاختلفت النسخ مع الوقت. في الخدمة تُكتب مرة واحدة.
+
+وتحتها النماذج وقاعدة البيانات: ثمانية عشر نموذجًا فوق MySQL.
+
+وثمة ضمانات عابرة للطبقات: كل عملية مركّبة تجري داخل معاملة قاعدة بيانات، فإما أن تكتمل كلها أو لا يُكتب منها شيء. والعمليات التي تقرأ رقمًا ثم تكتب بناءً عليه — كحساب الإشغال — تأخذ قفلًا على مستوى الصف حتى لا يقرأ طلبان الرقم نفسه ويكتبا فوقه. وسجل التدقيق يُكتب داخل المعاملة نفسها، فلا يبقى سجل لعملية أُلغيت.
+
+الزمن: 1.5 دقيقة.`);
+  }
+
+  // ==================== 7. DATABASE ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.LIGHT };
+    heading(s, 'تصميم قاعدة البيانات', 'المحور الثاني · البناء');
+    const groups = [
+      ['النواة', ['camps', 'shelters', 'refugees', 'households'], 'المخيم يحوي وحدات، والوحدة تُسكن لاجئين، واللاجئ ينتمي لأسرة', P.TEAL],
+      ['الحركة والأمن', ['checkpoints', 'entry_exit_logs', 'security_reports'], 'كل مرور مربوط ببوابة ووقت ومن سجّله', P.AMBER],
+      ['المساعدات', ['organizations', 'aid_types', 'aid_distributions'], 'التوزيع إمّا لفرد أو لأسرة، ويُجمع الاثنان عند الاستعلام', P.TEAL],
+      ['الطبي والسكن', ['medical_services', 'medical_records', 'residency_transfers'], 'كل نقل سكني يُحفظ فيبقى تاريخ الإقامة كاملًا', P.TEAL],
+      ['الحوكمة', ['users', 'roles', 'audit_logs', 'notifications', 'attachments'], 'من فعل، وماذا فعل، ومتى', P.TEAL],
+    ];
+    const gw = (W - 2 * M - 0.3) / 2, gh = 1.42;
+    groups.forEach((g, i) => {
+      let x, y;
+      if (i < 4) { const col = i % 2, row = Math.floor(i / 2); x = col === 0 ? W - M - gw : M; y = 1.72 + row * (gh + 0.18); }
+      else { x = M; y = 1.72 + 2 * (gh + 0.18); }
+      const wid = i < 4 ? gw : W - 2 * M;
+      card(s, x, y, wid, gh);
+      dot(s, x + wid - 0.5, y + 0.24, 0.26, g[3]);
+      T(s, g[0], { x: x + 0.25, y: y + 0.16, w: wid - 0.9, h: 0.3, fontSize: 13.5, bold: true, color: P.INK });
+      TL(s, g[1].join('   ·   '), { x: x + 0.25, y: y + 0.56, w: wid - 0.5, h: 0.3, fontSize: 11, color: P.TEAL, align: 'right' });
+      T(s, g[2], { x: x + 0.25, y: y + 0.94, w: wid - 0.5, h: 0.4, fontSize: 10.5, color: P.MUTED, lineSpacing: 14 });
+    });
+    const by = 1.72 + 2 * (gh + 0.18) + gh + 0.18;
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: by, w: W - 2 * M, h: 0.7, fill: { color: P.DARK }, rectRadius: 0.09 });
+    T(s, 'ثمانية عشر جدولًا · مفاتيح أجنبية تمنع السجل اليتيم · قيود فريدة · فهارس مركّبة على أعمدة البحث المتكرر · حذف ناعم يبقي التاريخ',
+      { x: M + 0.3, y: by, w: W - 2 * M - 0.6, h: 0.7, fontSize: 11.5, color: P.PALE, valign: 'middle', align: 'center' });
+    s.addNotes(`قاعدة البيانات ثمانية عشر جدولًا، وقد جمعتها هنا في خمس مجموعات.
+
+النواة: المخيمات، والوحدات السكنية، واللاجئون، والأسر. والعلاقة بينها هرمية: المخيم يحوي وحدات، والوحدة تُسكن لاجئين، واللاجئ ينتمي إلى أسرة لها رمز فريد ورب أسرة.
+
+الحركة والأمن: نقاط التفتيش، وسجل الدخول والخروج، والتقارير الأمنية. وكل حركة مربوطة ببوابة محددة ووقت بالدقيقة ومن سجّلها.
+
+المساعدات: المنظمات المانحة، وأنواع المساعدات، وعمليات التوزيع. ولاحظوا أن التوزيع يمكن أن يكون لفرد أو لأسرة، والنظام يجمع الاثنين عند السؤال عن شخص بعينه.
+
+الطبي والسكن: الخدمات الطبية والسجلات، وجدول انتقالات الإقامة الذي يحفظ كل نقل سكني — فتاريخ سكن أي شخص محفوظ بالكامل، لا حالته الحالية فقط.
+
+والحوكمة: المستخدمون والأدوار وسجل التدقيق والإشعارات والمرفقات.
+
+وأربعة قرارات تصميمية تسري على الجداول كلها: المفاتيح الأجنبية تمنع السجل اليتيم — لا يمكن أن يوجد لاجئ في مخيم غير موجود. والقيود الفريدة تمنع تكرار رقم الوثيقة أو رمز الوحدة داخل المخيم. والفهارس المركّبة على أعمدة البحث المتكرر تُبقي الاستعلامات سريعة مع نمو البيانات. والحذف الناعم في تسعة نماذج يعني أن الأرشفة لا تمحو السجل، فتبقى الروابط التاريخية سليمة ويمكن الاسترجاع.
+
+الزمن: 1.5 دقيقة.`);
+  }
+
+  // ==================== 8. MODULES ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.LIGHT };
+    heading(s, 'الوحدات الأساسية للنظام', 'المحور الثالث · الوظائف');
     const mods = [
-      [ic.user_w, 'سجلات اللاجئين', 'تسجيل، أسر، وثائق،\nوبطاقة تعريف بباركود', TEAL],
-      [ic.house_w, 'الوحدات السكنية', 'خيام وكرفانات بسعة محدّدة،\nونقل بسجل كامل', TEAL],
-      [ic.box_w, 'توزيع المساعدات', 'منظمات وأنواع، وتوزيع\nللفرد أو للأسرة', TEAL],
-      [ic.door_w, 'الدخول والخروج', 'بوابات ونقاط تفتيش،\nوحالة تواجد لحظية', AMBER],
-      [ic.med_w, 'السجلات الطبية', 'خدمات وتشخيصات\nومواعيد متابعة', TEAL],
-      [ic.chart_w, 'التقارير والتدقيق', 'تصدير Excel وطباعة،\nوسجل تدقيق كامل', TEAL],
+      [IC.user, 'سجلات اللاجئين', 'تسجيل، أسر، وثائق،\nوبطاقة تعريف بباركود', P.TEAL],
+      [IC.house, 'الوحدات السكنية', 'خيام وكرفانات بسعة محدّدة،\nونقل بسجل كامل', P.TEAL],
+      [IC.box, 'توزيع المساعدات', 'منظمات وأنواع، وتوزيع\nللفرد أو للأسرة', P.TEAL],
+      [IC.door, 'الدخول والخروج', 'بوابات ونقاط تفتيش،\nوحالة تواجد لحظية', P.AMBER],
+      [IC.med, 'السجلات الطبية', 'خدمات وتشخيصات\nومواعيد متابعة', P.TEAL],
+      [IC.chart, 'التقارير والتدقيق', 'تصدير Excel وطباعة،\nوسجل تدقيق كامل', P.TEAL],
     ];
     const cw = (W - 2 * M - 0.7) / 3, ch = 1.9;
     mods.forEach((m, i) => {
       const col = i % 3, row = Math.floor(i / 3);
-      const x = W - M - cw - col * (cw + 0.35);          // RTL: first card on the right
+      const x = W - M - cw - col * (cw + 0.35);
       const y = 1.72 + row * (ch + 0.22);
-      s.addShape(pres.ShapeType.roundRect, { x, y, w: cw, h: ch, fill: { color: CARD }, rectRadius: 0.1, shadow: shadow() });
-      s.addShape(pres.ShapeType.ellipse, { x: x + cw - 0.98, y: y + 0.26, w: 0.66, h: 0.66, fill: { color: m[3] } });
+      card(s, x, y, cw, ch);
+      dot(s, x + cw - 0.98, y + 0.26, 0.66, m[3]);
       s.addImage({ data: m[0], x: x + cw - 0.82, y: y + 0.42, w: 0.34, h: 0.34 });
-      s.addText(String(i + 1), { isTextBox: true, x: x + 0.26, y: y + 0.3, w: 0.5, h: 0.34, fontSize: 20, bold: true, color: 'DCE6E7', align: 'left', fontFace: F, margin: 0 });
-      s.addText(m[1], rtl({ x: x + 0.26, y: y + 1.0, w: cw - 0.52, h: 0.32, fontSize: 14.5, bold: true, color: INK }));
-      s.addText(m[2], rtl({ x: x + 0.26, y: y + 1.36, w: cw - 0.52, h: 0.44, fontSize: 11, color: MUTED, lineSpacing: 14 }));
+      TL(s, String(i + 1), { x: x + 0.26, y: y + 0.3, w: 0.5, h: 0.34, fontSize: 20, bold: true, color: P.LINE });
+      T(s, m[1], { x: x + 0.26, y: y + 1.0, w: cw - 0.52, h: 0.32, fontSize: 14.5, bold: true, color: P.INK });
+      T(s, m[2], { x: x + 0.26, y: y + 1.36, w: cw - 0.52, h: 0.44, fontSize: 11, color: P.MUTED, lineSpacing: 14 });
     });
-
     const nw = W - 2 * M;
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.94, w: nw, h: 1.0, fill: { color: DARK }, rectRadius: 0.1 });
-    s.addShape(pres.ShapeType.ellipse, { x: M + nw - 0.85, y: 6.2, w: 0.5, h: 0.5, fill: { color: AMBER } });
-    s.addImage({ data: ic.lang_w, x: M + nw - 0.72, y: 6.33, w: 0.24, h: 0.24 });
-    s.addText('بحث عربي ذكي يخدم الوحدات كلها', rtl({ x: M + 0.3, y: 6.14, w: nw - 1.25, h: 0.3, fontSize: 13.5, bold: true, color: WHITE }));
-    s.addText('توحيد الهمزات والتاء المربوطة والألف المقصورة، وحذف التشكيل، وتحويل الأرقام الهندية، وتُطبَّق على طرفَي المقارنة معًا',
-      rtl({ x: M + 0.3, y: 6.5, w: nw - 1.25, h: 0.3, fontSize: 11, color: PALE }));
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.94, w: nw, h: 1.0, fill: { color: P.DARK }, rectRadius: 0.1 });
+    dot(s, M + nw - 0.85, 6.2, 0.5, P.AMBER);
+    s.addImage({ data: IC.lang, x: M + nw - 0.72, y: 6.33, w: 0.24, h: 0.24 });
+    T(s, 'بحث عربي ذكي يخدم الوحدات كلها', { x: M + 0.3, y: 6.14, w: nw - 1.25, h: 0.3, fontSize: 13.5, bold: true, color: P.WHITE });
+    T(s, 'توحيد الهمزات والتاء المربوطة والألف المقصورة، وحذف التشكيل، وتحويل الأرقام الهندية، وتُطبَّق على طرفَي المقارنة معًا',
+      { x: M + 0.3, y: 6.5, w: nw - 1.25, h: 0.3, fontSize: 11, color: P.PALE });
+    s.addNotes(`وحدات النظام الست، وسأركّز على القرار الهندسي داخل كل وحدة لا على شكل الشاشة.
 
-    s.addNotes(`أستعرض وحدات النظام الست، وسأركّز على القرار الهندسي داخل كل وحدة لا على شكل الشاشة.
+الأولى: سجلات اللاجئين. تسجيل بيانات الشخص، وربطه بأسرة عبر رمز فريد مع تحديد صلة القرابة، وأرشفة المرفقات كصور الوثائق. والنظام يولّد لكل لاجئ بطاقة تعريف تحمل باركود بمعيار Code128 — برمجت مولّد الباركود بنفسي داخل المشروع دون مكتبة خارجية، وله ستة اختبارات.
 
-الوحدة الأولى: سجلات اللاجئين. تسجيل بيانات الشخص، وربطه بأسرة عبر رمز أسرة فريد مع تحديد صلة القرابة برب الأسرة، وأرشفة المرفقات كصور الوثائق. والنظام يولّد لكل لاجئ بطاقة تعريف تحمل باركود بمعيار Code128 — وقد برمجت مولّد الباركود بنفسي داخل المشروع دون مكتبة خارجية.
+الثانية: الوحدات السكنية. لكل وحدة رمز وسعة وحالة. والنقل يمرّ عبر خدمة واحدة تتحقق من السعة وترفض التجاوز. وكل نقل يُكتب في جدول انتقالات الإقامة، فتاريخ سكن أي شخص محفوظ بالكامل.
 
-الوحدة الثانية: الوحدات السكنية. كل مخيم يحتوي وحدات — خيمة أو كرفان — لكل منها رمز وسعة وحالة. والنقل يمرّ عبر خدمة واحدة تتحقق من السعة وترفض التجاوز. والأهم أن كل نقل يُكتب في جدول residency_transfers، فتاريخ سكن أي شخص محفوظ بالكامل: أين كان، ومتى انتقل، ومن نقله، ولماذا.
+الثالثة: توزيع المساعدات. تُسجَّل المنظمات وأنواع المساعدات، ثم عمليات التوزيع لفرد أو لأسرة. والنظام يجمع الاثنين عند الاستعلام: فحين تسأل «ماذا استلم فلان؟» يحسب ما وصله شخصيًا وما وصله عبر أسرته. هذه التفصيلة هي الفرق بين رقم صحيح ورقم ناقص.
 
-الوحدة الثالثة: توزيع المساعدات. تسجّل المنظمات المانحة وأنواع المساعدات ووحدات القياس، ثم تُسجَّل عمليات التوزيع — إما لفرد أو لأسرة كاملة. والنظام يميّز بين الحالتين ويجمعهما عند الاستعلام: فحين تسأل «ماذا استلم فلان؟» يحسب ما وصله شخصيًا وما وصله عبر أسرته معًا. هذه التفصيلة هي الفرق بين رقم صحيح ورقم ناقص.
+الرابعة، وأخصّها بالتفصيل: حركة الدخول والخروج. عند كل مرور يُسجَّل الشخص والبوابة والنوع والوقت والسبب ومن سجّل. وتُحدَّث حالة التواجد فورًا: داخل أو خارج. فيصبح سؤال «من الموجود الآن؟» استعلامًا لحظيًا.
 
-الوحدة الرابعة، وأخصّها بالتفصيل: حركة الدخول والخروج. لكل مخيم نقاط تفتيش، وعند كل مرور يُسجَّل: الشخص، والبوابة، والنوع، والوقت بالدقيقة، والسبب، ومن سجّل العملية. وتُحدَّث حالة التواجد فورًا: داخل أو خارج. فيصبح سؤال «من الموجود داخل المخيم الآن؟» استعلامًا لحظيًا.
+وهنا حالة واقعية عالجتها: ماذا لو مرّ لاجئ من بوابة مخيم غير مخيمه؟ الناس تنتقل فعلًا. الحل الساذج أن يرفض النظام التسجيل — لكن الرفض لا يمنع المرور، بل يترك ثغرة في السجل. لذلك يُسجَّل المرور دائمًا، ويُنسب إلى مخيم البوابة لا مخيم الشخص، لأن الحدث وقع عند البوابة، مع علامة في سجل التدقيق تجعل هذه الحالات قابلة للبحث. ومع ذلك المرور لا يغيّر مكان الإقامة: تغيير الإقامة نقلٌ رسمي يمرّ بخدمة السكن وفحوصات السعة.
 
-وهنا حالة واقعية عالجتها: ماذا لو مرّ لاجئ من بوابة مخيم غير مخيمه؟ الناس تنتقل بين المخيمات فعلًا. الحل الساذج أن يرفض النظام التسجيل — لكن الرفض لا يمنع المرور، بل يترك ثغرة في السجل. لذلك قررت أن يُسجَّل المرور دائمًا، وأن يُنسب إلى مخيم البوابة لا مخيم الشخص — لأن الحدث وقع عند البوابة — مع وضع علامة cross_camp في سجل التدقيق تجعل هذه الحالات قابلة للبحث. ومع ذلك، المرور لا يغيّر مكان الإقامة: فتغيير الإقامة نقلٌ رسمي يمرّ بخدمة السكن وفحوصات السعة، ولا يجوز الالتفاف عليه من بوابة.
+الخامسة: السجلات الطبية بمواعيد متابعة تُنبَّه عند استحقاقها. والسادسة: التقارير والتدقيق، بتصدير إلى Excel وطباعة.
 
-الوحدة الخامسة: السجلات الطبية بخدمات وتشخيصات ومواعيد متابعة تُنبَّه عند استحقاقها. والسادسة: التقارير والتدقيق — تقارير قابلة للتصدير إلى Excel والطباعة، وسجل تدقيق يوثّق كل عملية حسّاسة.
-
-وعنصر يخدم الوحدات كلها: البحث العربي الذكي. بنيت طبقة تطبيع توحّد الهمزات، والتاء المربوطة مع الهاء، والألف المقصورة مع الياء، وتحذف التشكيل والتطويل، وتحوّل الأرقام الهندية إلى عربية. وتُطبَّق على طرفَي المقارنة: على ما يكتبه المستخدم وعلى ما هو مخزَّن. وبهذا «احمد» تجد «أحمد» — وتُغلق الثغرة التي ذكرتها في شريحة المشكلة.
+وعنصر يخدم الوحدات كلها: البحث العربي الذكي. طبقة تطبيع توحّد الهمزات والتاء المربوطة والألف المقصورة، وتحذف التشكيل والتطويل، وتحوّل الأرقام الهندية. وتُطبَّق على طرفَي المقارنة: على ما يكتبه المستخدم وعلى ما هو مخزَّن. وبهذا «احمد» تجد «أحمد» — وتُغلق الثغرة التي ذكرتها في شريحة المشكلة.
 
 [أداء] إن ضاق الوقت اختصر الوحدات 1 و5 و6، واحتفظ بتفصيل الوحدة الرابعة. الزمن: 2.5 دقيقة.`);
   }
 
-  // ============================ 6. ASSISTANT (star, dark) ============================
+  // ==================== 9. ROLES MATRIX ====================
   {
     const s = pres.addSlide();
-    s.background = { color: DARK };
-    s.addText('الابتكار البرمجي  ·  نقطة قوة المشروع', rtl({ x: M, y: 0.42, w: W - 2 * M, h: 0.3, fontSize: 13, bold: true, color: AMBER, charSpacing: 1 }));
-    s.addText('المساعد الذكي — محرّك تحليل النوايا', rtl({ x: M, y: 0.76, w: W - 2 * M, h: 0.6, fontSize: 34, bold: true, color: WHITE }));
+    s.background = { color: P.LIGHT };
+    heading(s, 'الصلاحيات والأدوار', 'المحور الثالث · الوظائف');
+    const areas = ['التسجيل', 'السكن', 'المساعدات', 'الطبي', 'الأمن', 'الإدارة'];
+    const roles = [
+      ['مدير النظام', [1, 1, 1, 1, 1, 1]],
+      ['المدير', [1, 1, 1, 1, 1, 1]],
+      ['موظف التسجيل', [1, 0, 0, 0, 0, 1]],
+      ['موظف السكن', [0, 1, 0, 0, 0, 1]],
+      ['موظف المساعدات', [0, 0, 1, 0, 0, 1]],
+      ['الموظف الطبي', [0, 0, 0, 1, 0, 1]],
+      ['ضابط الأمن', [0, 0, 0, 0, 1, 1]],
+    ];
+    const nameW = 2.6, colW = (W - 2 * M - nameW) / areas.length, nameX = W - M - nameW;
+    const rowH = 0.55, top = 1.78;
+    areas.forEach((a, j) => {
+      const x = nameX - (j + 1) * colW;
+      T(s, a, { x, y: top, w: colW, h: 0.44, fontSize: 11.5, bold: true, color: P.TEAL, align: 'center', valign: 'middle' });
+    });
+    roles.forEach((r, i) => {
+      const y = top + 0.5 + i * rowH;
+      card(s, M, y, W - 2 * M, rowH - 0.08, i < 2 ? P.TINT_T : P.CARD);
+      T(s, r[0], { x: nameX + 0.1, y, w: nameW - 0.35, h: rowH - 0.08, fontSize: 12.5, bold: true, color: P.INK, valign: 'middle' });
+      r[1].forEach((v, j) => {
+        const x = nameX - (j + 1) * colW;
+        if (v) {
+          dot(s, x + colW / 2 - 0.13, y + (rowH - 0.08) / 2 - 0.13, 0.26, j === 5 ? P.SEA : P.TEAL);
+          s.addImage({ data: IC.check, x: x + colW / 2 - 0.065, y: y + (rowH - 0.08) / 2 - 0.065, w: 0.13, h: 0.13 });
+        } else {
+          s.addShape(pres.ShapeType.roundRect, { x: x + colW / 2 - 0.09, y: y + (rowH - 0.08) / 2 - 0.02, w: 0.18, h: 0.05, fill: { color: P.LINE }, rectRadius: 0.02 });
+        }
+      });
+    });
+    const by = top + 0.5 + roles.length * rowH + 0.16;
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: by, w: W - 2 * M, h: 0.78, fill: { color: P.DARK }, rectRadius: 0.09 });
+    T(s, 'الخريطة نفسها تحكم الشاشات والمساعد الذكي معًا — نسخة واحدة في الكود، فلا يصبح المساعد بابًا خلفيًا للبيانات',
+      { x: M + 0.3, y: by, w: W - 2 * M - 0.6, h: 0.78, fontSize: 12, color: P.PALE, valign: 'middle', align: 'center' });
+    s.addNotes(`النظام فيه سبعة أدوار، وهذه خريطة من يرى ماذا.
 
-    // right: question bubbles
+مدير النظام والمدير يريان كل المجالات. أما الأدوار المتخصصة فكل منها يرى مجاله ومجال الإدارة فقط: موظف التسجيل يرى السكان والأسر، وموظف السكن يرى الوحدات والإشغال، وموظف المساعدات يرى التوزيع، والموظف الطبي يرى السجلات الطبية، وضابط الأمن يرى الحركة والتقارير الأمنية.
+
+ولاحظوا العمود الأخير: الإدارة مفتوحة للجميع، لأنه العمود الذي يحمل المؤشرات العامة التي يحتاجها كل موظف ليعرف موقعه من العمل.
+
+لكن النقطة الهندسية الأهم هي السطر أسفل الجدول: هذه الخريطة مكتوبة مرة واحدة في الكود، في صنف واحد. ومنها تقرأ لوحة التحكم أي بطاقات تعرض، ومنها يقرأ المساعد الذكي أي أسئلة يجيب عنها.
+
+ولماذا هذا مهم؟ لأنني لو كتبت الصلاحيات مرتين — مرة للشاشات ومرة للمساعد — لاختلفت النسختان مع الوقت، ولأصبح المساعد بابًا خلفيًا: موظف طبي لا يستطيع فتح شاشة المساعدات، لكنه يسأل المساعد فيحصل على الأرقام. وقد تجنّبت ذلك بأن جعلت المصدر واحدًا.
+
+والأثر مُختبَر: هناك اختبار يتحقق أن دورًا خارج المجال يُرفض طلبه بأدب، ولا يُعطى رقمًا مختلفًا ولا ناقصًا.
+
+الزمن: 1.5 دقيقة.`);
+  }
+
+  // ==================== 10. ASSISTANT — THE DECISION ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.DARK };
+    heading(s, 'المساعد الذكي — الفكرة والقرار', 'المحور الرابع · الابتكار البرمجي', true);
     const qw = 5.7, qx = W - M - qw;
-    s.addText('اسأل بالعربية، واحصل على رقم من قاعدة البيانات', rtl({ x: qx, y: 1.6, w: qw, h: 0.3, fontSize: 12.5, bold: true, color: SEA }));
-    const qs = ['أين يسكن أحمد الحسن؟', 'كم عدد السكان في مخيم السلام؟', 'كم وحدة سكنية فارغة؟', 'ماذا استلم محمد من مساعدات الشهر الماضي؟'];
-    qs.forEach((q, i) => {
+    T(s, 'اسأل بالعربية، واحصل على رقم من قاعدة البيانات', { x: qx, y: 1.6, w: qw, h: 0.3, fontSize: 12.5, bold: true, color: P.SEA });
+    ['أين يسكن أحمد الحسن؟', 'كم عدد السكان في مخيم السلام؟', 'كم وحدة سكنية فارغة؟', 'ماذا استلم محمد من مساعدات الشهر الماضي؟'].forEach((q, i) => {
       const y = 2.02 + i * 0.78;
-      s.addShape(pres.ShapeType.roundRect, { x: qx, y, w: qw, h: 0.62, fill: { color: DARK2 }, rectRadius: 0.16 });
-      s.addText(q, rtl({ x: qx + 0.28, y, w: qw - 0.56, h: 0.62, fontSize: 13.5, color: WHITE, valign: 'middle' }));
+      s.addShape(pres.ShapeType.roundRect, { x: qx, y, w: qw, h: 0.62, fill: { color: P.DARK2 }, rectRadius: 0.16 });
+      T(s, q, { x: qx + 0.28, y, w: qw - 0.56, h: 0.62, fontSize: 13.5, color: P.WHITE, valign: 'middle' });
     });
-
-    // left: pipeline
-    const pw2 = W - 2 * M - qw - 0.5, px2 = M;
-    s.addText('كيف يعمل؟  أربع مراحل', rtl({ x: px2, y: 1.6, w: pw2, h: 0.3, fontSize: 12.5, bold: true, color: SEA }));
-    const steps = [['تطبيع النص العربي', 'توحيد الهمزات والتشكيل والأرقام'],
-                   ['تحليل النوايا', '10 نوايا، كل واحدة صنف برمجي مستقل'],
-                   ['الترجيح بالنقاط', 'الأعلى ثقةً تفوز، لا أول تطابق'],
-                   ['استعلام جاهز ومُختبَر', 'كتبه مطوّر ويغطّيه اختبار']];
-    steps.forEach((st, i) => {
-      const y = 2.02 + i * 0.78;
-      s.addShape(pres.ShapeType.roundRect, { x: px2, y, w: pw2, h: 0.62, fill: { color: DARK2 }, rectRadius: 0.08 });
-      s.addShape(pres.ShapeType.ellipse, { x: px2 + pw2 - 0.6, y: y + 0.13, w: 0.36, h: 0.36, fill: { color: i === 2 ? AMBER : TEAL } });
-      s.addText(String(i + 1), { isTextBox: true, x: px2 + pw2 - 0.6, y: y + 0.13, w: 0.36, h: 0.36, fontSize: 12, bold: true, color: WHITE, align: 'center', valign: 'middle', fontFace: F, margin: 0 });
-      s.addText(st[0], rtl({ x: px2 + 0.22, y: y + 0.08, w: pw2 - 0.95, h: 0.26, fontSize: 12.5, bold: true, color: WHITE }));
-      s.addText(st[1], rtl({ x: px2 + 0.22, y: y + 0.33, w: pw2 - 0.95, h: 0.24, fontSize: 10, color: PALE }));
+    const rw = W - 2 * M - qw - 0.5, rx = M;
+    T(s, 'بلا نموذج لغوي — ولماذا هذا قرار لا قصور', { x: rx, y: 1.6, w: rw, h: 0.3, fontSize: 12.5, bold: true, color: P.AMBER });
+    const reasons = [
+      ['الخصوصية', 'أسماء ولاجئون وتشخيصات طبية لا تغادر الخادم، والنظام يعمل دون إنترنت'],
+      ['الدقة', 'النموذج ينتج إجابة محتملة، ونحن نحتاج إجابة صحيحة من قاعدة البيانات'],
+      ['الأمان', 'ما دام المستخدم لا يكتب الاستعلام فلا يستطيع توسيعه مهما كتب'],
+    ];
+    reasons.forEach((r, i) => {
+      const y = 2.02 + i * 1.05;
+      s.addShape(pres.ShapeType.roundRect, { x: rx, y, w: rw, h: 0.9, fill: { color: P.DARK2 }, rectRadius: 0.09 });
+      dot(s, rx + rw - 0.6, y + 0.14, 0.34, P.AMBER);
+      T(s, String(i + 1), { x: rx + rw - 0.6, y: y + 0.14, w: 0.34, h: 0.34, fontSize: 12, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+      T(s, r[0], { x: rx + 0.22, y: y + 0.12, w: rw - 0.95, h: 0.28, fontSize: 13.5, bold: true, color: P.WHITE });
+      T(s, r[1], { x: rx + 0.22, y: y + 0.42, w: rw - 0.5, h: 0.44, fontSize: 10.5, color: P.PALE, lineSpacing: 14 });
     });
-
-    // bottom guarantees
-    const gs = [['بلا نموذج لغوي (LLM)', AMBER], ['بلا SQL مُولَّد من كلام المستخدم', AMBER], ['البيانات لا تغادر الخادم', AMBER]];
     let gx = W - M;
-    gs.forEach((g) => {
+    [['بلا نموذج لغوي', 'LLM'], ['بلا SQL مُولَّد من كلام المستخدم', ''], ['البيانات لا تغادر الخادم', '']].forEach((g) => {
       const gw = 3.9;
       gx -= gw;
-      s.addShape(pres.ShapeType.roundRect, { x: gx, y: 5.62, w: gw, h: 0.72, fill: { color: DARK2 }, line: { color: g[1], width: 1 }, rectRadius: 0.1 });
-      s.addText(g[0], { isTextBox: true, x: gx + 0.15, y: 5.62, w: gw - 0.3, h: 0.72, fontSize: 12.5, bold: true, color: g[1], align: 'center', valign: 'middle', fontFace: F, rtlMode: true, margin: 0 });
+      s.addShape(pres.ShapeType.roundRect, { x: gx, y: 5.62, w: gw, h: 0.72, fill: { color: P.DARK2 }, line: { color: P.AMBER, width: 1 }, rectRadius: 0.1 });
+      T(s, g[0], { x: gx + 0.15, y: 5.62, w: gw - 0.3, h: 0.72, fontSize: 12.5, bold: true, color: P.AMBER, align: 'center', valign: 'middle' });
       gx -= 0.22;
     });
-    s.addText('الدقة والخصوصية والأمان: ثلاثتها نتيجة قرار واحد، أن تختار الجملةُ الاستعلامَ لا أن تكتبه.',
-      rtl({ x: M, y: 6.55, w: W - 2 * M, h: 0.35, fontSize: 12, color: PALE, align: 'center' }));
-
+    T(s, 'كل نيّة تملك استعلامًا كتبه مطوّر ويغطّيه اختبار — الجملة تختار أي استعلام يُنفَّذ، ولا تكتبه',
+      { x: M, y: 6.55, w: W - 2 * M, h: 0.35, fontSize: 12, color: P.PALE, align: 'center' });
     s.addNotes(`نصل إلى الميزة التي أعتبرها نقطة القوة الحقيقية: المساعد الذكي.
 
 الفكرة: بدل أن يتنقّل الموظف بين الشاشات ليجد رقمًا، يكتب سؤاله بالعربية في مربع حوار داخل النظام، فيحصل على الإجابة مع السجلات وروابط الإجراء المناسبة.
 
-وقبل أن أشرح كيف يعمل، أودّ توضيح ما لا يفعله — لأن هذا هو القرار الهندسي الأهم في المشروع كله: هذا المساعد لا يستخدم نموذجًا لغويًا كبيرًا (LLM)، ولا يولّد جملة SQL من كلام المستخدم. وهذا اختيار مقصود لثلاثة أسباب:
+وقبل أن أشرح كيف يعمل، أودّ توضيح ما لا يفعله، لأن هذا هو القرار الهندسي الأهم في المشروع كله: هذا المساعد لا يستخدم نموذجًا لغويًا كبيرًا، ولا يولّد جملة SQL من كلام المستخدم. وهذا اختيار مقصود لثلاثة أسباب:
 
-الأول — الخصوصية. نحن نتعامل مع أسماء لاجئين وأرقام وثائق وتشخيصات طبية. إرسال هذه البيانات إلى خدمة خارجية غير مقبول أخلاقيًا ولا قانونيًا. في تصميمي لا تغادر البيانات الخادم إطلاقًا، والنظام يعمل كاملًا دون اتصال بالإنترنت.
+الأول، الخصوصية: نحن نتعامل مع أسماء لاجئين وأرقام وثائق وتشخيصات طبية. إرسال هذه البيانات إلى خدمة خارجية غير مقبول أخلاقيًا ولا قانونيًا. في تصميمي لا تغادر البيانات الخادم إطلاقًا، والنظام يعمل كاملًا دون اتصال بالإنترنت — وهذا وحده يجعله صالحًا لمخيم حقيقي قد لا يملك اتصالًا مستقرًا.
 
-الثاني — الدقة. النموذج اللغوي ينتج إجابة محتملة؛ ونحن نحتاج إجابة صحيحة. حين يُسأل النظام «كم عدد السكان؟» فالرقم يجب أن يكون رقم قاعدة البيانات، لا رقمًا معقولًا. في تصميمي كل نيّة تملك استعلامًا كتبه مطوّر ويغطّيه اختبار؛ الجملة تختار أي استعلام يُنفَّذ فقط، ولا تكتبه.
+الثاني، الدقة: النموذج اللغوي ينتج إجابة محتملة، ونحن نحتاج إجابة صحيحة. حين يُسأل النظام «كم عدد السكان؟» فالرقم يجب أن يكون رقم قاعدة البيانات، لا رقمًا معقولًا. في تصميمي كل نيّة تملك استعلامًا كتبه مطوّر ويغطّيه اختبار.
 
-الثالث — الأمان. ما دام المستخدم لا يستطيع كتابة الاستعلام، فلا يستطيع توسيعه. مهما كتب، لن يقرأ إلا ما تسمح به النيّة المُعرَّفة مسبقًا وصلاحيات دوره. وهذا يغلق فئة كاملة من الثغرات تُعرف بـ Prompt Injection قبل أن تُفتح.
+الثالث، الأمان: ما دام المستخدم لا يستطيع كتابة الاستعلام فلا يستطيع توسيعه. مهما كتب، لن يقرأ إلا ما تسمح به النيّة المُعرَّفة مسبقًا وصلاحيات دوره. وهذا يغلق فئة كاملة من الثغرات تُعرف بحقن التعليمات قبل أن تُفتح.
 
-والآن كيف يعمل فعليًا؟ أربع مراحل:
+[أداء] إن سألت اللجنة «أليس هذا بدائيًا؟» فالجواب في الشريحة التالية: أرِهم المحرّك.
 
-المرحلة الأولى — تطبيع النص: يُفَّرد السؤال إلى صورته الموحّدة. فتصبح «أين يسكن أحمد؟» و«اين يسكن احمد» السؤال نفسه داخل النظام.
-
-المرحلة الثانية — تحليل النوايا: لدي عشر نوايا مُعرَّفة، كل واحدة صنف برمجي مستقل — نيّة لحالة السكن، ولعدد السكان، وللوحدات الشاغرة، وللمساعدات. وكل نيّة تفحص السؤال وتجيب: هل هذا السؤال يخصّني؟
-
-المرحلة الثالثة — الترجيح بالنقاط، وهي ألطف جزئية في التصميم. النيّة لا تجيب بنعم أو لا، بل بدرجة ثقة تساوي عدد الإشارات التي التقطتها. ثم تفوز صاحبة الدرجة الأعلى. ولماذا النقاط بدل أول تطابق؟ لأن الكلمات تتقاطع: «أين يسكن أحمد؟» و«كم شخصًا بلا سكن؟» كلاهما فيه كلمة «سكن»، لكن الأول سؤال عن شخص والثاني إحصاء عن المخيم. ولو أخذنا أول تطابق لأجاب النظام إجابة خاطئة بثقة تامة. فبرمجت نيّة حالة السكن أن تنسحب فور رؤية أدوات العدّ — «كم»، «عدد»، «إحصائية» — وبذلك يذهب كل سؤال إلى صاحبه.
-
-المرحلة الرابعة — التنفيذ: تستخرج النيّة الفائزة «الموضوع» من السؤال — الاسم أو الرقم — بعد حذف كلماتها المفتاحية وكلمات الوقف. فمن «ابحث عن أحمد» يبقى «أحمد» لا «عن أحمد». ثم يُنفَّذ الاستعلام الجاهز، وتُعاد الإجابة كجملة عربية مفهومة مع السجلات والأرقام وروابط الإجراء المناسبة للدور — فموظف السكن يرى زر «نقل إلى وحدة أخرى» تحت الإجابة، ولا يظهر لمن لا يملك صلاحيته.
-
-ونقطة أخيرة: المساعد يخضع لنظام الصلاحيات نفسه الذي تخضع له الشاشات، من مصدر واحد في الكود. فموظف طبي يسأل عن أرقام المساعدات يُرفض طلبه بأدب، ولا يُعطى رقمًا مختلفًا ولا ناقصًا. ولو كانت الصلاحيات مكتوبة مرتين — للشاشات وللمساعد — لاختلفتا مع الوقت، ولأصبح المساعد بابًا خلفيًا للبيانات.
-
-[أداء] هذه الشريحة تستحق عرضًا حيًّا. اكتب سؤالين: ناجحًا ثم باسم ملتبس، لينتقل الحديث طبيعيًا إلى الشريحة التالية. واحتفظ بلقطات شاشة احتياطية. الزمن: 3 دقائق.`);
+الزمن: 2 دقيقة.`);
   }
 
-  // ============================ 7. ROBUSTNESS ============================
+  // ==================== 11. INTENT ENGINE ====================
   {
     const s = pres.addSlide();
-    s.background = { color: LIGHT };
-    heading(s, 'التحديات التقنية والتدهور الآمن', 'الفصل الخامس  ·  متانة النظام');
-
-    const cases = [
-      ['اسم ملتبس', '٣ أشخاص باسم «محمد»', 'يشرح كيف تحدّد الشخص (الاسم الثلاثي أو رقم الوثيقة) ويعرض القائمة', AMBER],
-      ['مخيم غير موجود', 'سؤال عن مخيم غير مسجّل', 'يصرّح بعدم وجوده ويعرض المخيمات المسجّلة فعلًا', AMBER],
-      ['لا نتائج', 'الاستعلام أعاد صفرًا', '«لم أجد» تختلف عن «صفر»: نبرتان مختلفتان في الواجهة', TEAL],
-      ['سؤال غير مفهوم', 'لا نيّة طالبت به', 'بحث شامل احتياطي، ثم أمثلة على أسئلة يفهمها النظام', TEAL],
-      ['خطأ غير متوقع', 'عطل برمجي أو انقطاع', 'ردّ لبق للمستخدم (HTTP 200) + الاستثناء كاملًا في سجل المطوّر', TEAL],
+    s.background = { color: P.LIGHT };
+    heading(s, 'محرّك تحليل النوايا — كيف يختار', 'المحور الرابع · الابتكار البرمجي');
+    const pw = (W - 2 * M - 3 * 0.24) / 4;
+    [['تطبيع النص', 'توحيد الهمزات والتشكيل والأرقام'],
+     ['مطالبة النوايا', 'عشر نوايا، كل واحدة صنف مستقل'],
+     ['الترجيح بالنقاط', 'درجة الثقة = عدد الإشارات'],
+     ['تنفيذ استعلام جاهز', 'كتبه مطوّر ويغطّيه اختبار']].forEach((st, i) => {
+      const x = W - M - pw - i * (pw + 0.24);
+      card(s, x, 1.7, pw, 1.05);
+      dot(s, x + pw - 0.5, 1.86, 0.32, i === 2 ? P.AMBER : P.TEAL);
+      T(s, String(i + 1), { x: x + pw - 0.5, y: 1.86, w: 0.32, h: 0.32, fontSize: 11.5, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+      T(s, st[0], { x: x + 0.2, y: 1.84, w: pw - 0.78, h: 0.3, fontSize: 13, bold: true, color: P.INK });
+      T(s, st[1], { x: x + 0.2, y: 2.2, w: pw - 0.4, h: 0.44, fontSize: 10, color: P.MUTED, lineSpacing: 13 });
+    });
+    T(s, 'مثالان يوضحان لماذا النقاط، لا أول تطابق', { x: M, y: 2.95, w: W - 2 * M, h: 0.3, fontSize: 13, bold: true, color: P.TEAL, align: 'center' });
+    const ew = (W - 2 * M - 0.35) / 2;
+    const examples = [
+      ['أين يسكن أحمد الحسن؟', [['housing_status', '٣', true], ['unhoused', 'لا يطالب', false], ['النوايا الأخرى', 'درجة أدنى', false]], 'سؤال عن شخص'],
+      ['كم شخصًا بلا سكن؟', [['unhoused', '٣', true], ['housing_status', 'ينسحب', false], ['النوايا الأخرى', 'لا تطالب', false]], 'إحصاء عن المخيم'],
     ];
-    const rw = W - 2 * M, rh = 0.78;
-    cases.forEach((c, i) => {
-      const y = 1.72 + i * (rh + 0.13);
-      s.addShape(pres.ShapeType.roundRect, { x: M, y, w: rw, h: rh, fill: { color: CARD }, rectRadius: 0.08, shadow: shadow() });
-      s.addShape(pres.ShapeType.roundRect, { x: M + rw - 3.55, y: y + 0.11, w: 3.35, h: rh - 0.22, fill: { color: i < 2 ? 'FDF3E3' : 'ECF4F4' }, rectRadius: 0.06 });
-      s.addText(c[0], rtl({ x: M + rw - 3.45, y: y + 0.15, w: 3.15, h: 0.28, fontSize: 13, bold: true, color: i < 2 ? 'B4761C' : TEAL }));
-      s.addText(c[1], rtl({ x: M + rw - 3.45, y: y + 0.44, w: 3.15, h: 0.24, fontSize: 10, color: MUTED }));
-      s.addImage({ data: ic.arrow_t, x: M + rw - 3.95, y: y + rh / 2 - 0.1, w: 0.2, h: 0.2 });
-      s.addText(c[2], rtl({ x: M + 0.28, y, w: rw - 4.35, h: rh, fontSize: 12.5, color: INK, valign: 'middle', lineSpacing: 16 }));
+    examples.forEach((ex, k) => {
+      const x = k === 0 ? W - M - ew : M;
+      card(s, x, 3.35, ew, 3.05);
+      s.addShape(pres.ShapeType.roundRect, { x: x + 0.22, y: 3.55, w: ew - 0.44, h: 0.55, fill: { color: P.DARK }, rectRadius: 0.14 });
+      T(s, ex[0], { x: x + 0.4, y: 3.55, w: ew - 0.8, h: 0.55, fontSize: 12.5, color: P.WHITE, valign: 'middle' });
+      ex[1].forEach((r, i) => {
+        const y = 4.28 + i * 0.52;
+        s.addShape(pres.ShapeType.roundRect, { x: x + 0.22, y, w: ew - 0.44, h: 0.44, fill: { color: r[2] ? P.TINT_A : P.TINT_T }, rectRadius: 0.06 });
+        TL(s, r[0], { x: x + 0.38, y, w: ew - 2.1, h: 0.44, fontSize: 11.5, bold: r[2], color: r[2] ? 'B4761C' : P.MUTED, align: 'right', valign: 'middle' });
+        T(s, String(r[1]) + (r[2] ? '  ✓' : ''), { x: x + 0.38, y, w: ew - 0.8, h: 0.44, fontSize: 11.5, bold: r[2], color: r[2] ? 'B4761C' : P.MUTED, align: 'left', valign: 'middle' });
+      });
+      T(s, ex[2], { x: x + 0.22, y: 5.95, w: ew - 0.44, h: 0.3, fontSize: 11, color: P.MUTED, align: 'center' });
     });
+    T(s, 'الكلمتان تشتركان في «سكن» — ولو أخذنا أول تطابق لأجاب النظام إجابة خاطئة بثقة تامة',
+      { x: M, y: 6.55, w: W - 2 * M, h: 0.3, fontSize: 11.5, color: P.INK, align: 'center' });
+    s.addNotes(`هذه هي آلية المحرّك في أربع مراحل، ثم مثالان يوضحان لماذا صمّمته هكذا.
 
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 6.28, w: rw, h: 0.78, fill: { color: DARK }, rectRadius: 0.1 });
-    s.addShape(pres.ShapeType.ellipse, { x: M + rw - 0.72, y: 6.45, w: 0.44, h: 0.44, fill: { color: AMBER } });
-    s.addImage({ data: ic.shield_w, x: M + rw - 0.6, y: 6.57, w: 0.2, h: 0.2 });
-    s.addText('صندوق الحوار لا يردّ أبدًا بـ Error 500',
-      rtl({ x: M + rw - 7.2, y: 6.28, w: 6.4, h: 0.78, fontSize: 14, bold: true, color: WHITE, valign: 'middle' }));
-    s.addText('قد يعجز عن الإجابة، لكنه لا ينهار، ولا يخترع إجابة، ولا يفشل بصمت',
-      rtl({ x: M + 0.3, y: 6.28, w: 4.5, h: 0.78, fontSize: 11.5, color: PALE, valign: 'middle' }));
+المرحلة الأولى، تطبيع النص: يُفَّرد السؤال إلى صورته الموحّدة. فتصبح «أين يسكن أحمد؟» و«اين يسكن احمد» السؤال نفسه داخل النظام.
 
-    s.addNotes(`هذه الشريحة هي التي أرجو أن تُقيَّم بها هندسة المشروع، لأن الفرق بين نموذج أوّلي ونظام صالح للتشغيل ليس في المسار الناجح، بل في ما يحدث حين تسوء الأمور.
+المرحلة الثانية، مطالبة النوايا: لدي عشر نوايا، كل واحدة صنف برمجي مستقل. وكل نيّة تفحص السؤال وتجيب عن سؤال واحد: هل هذا السؤال يخصّني؟
 
-الحالة الأولى: الاسم الملتبس. في مخيم فيه آلاف الأشخاص، اسم «محمد» يطابق العشرات. الخطأ الفادح أن يختار النظام الأول ويجيب بثقة — فيُعطي عنوان شخص آخر. وهذا في سياق إنساني ليس خطأً تقنيًا فقط، بل قد يكون خطرًا على شخص. والحل الناقص أن يقول «الاسم ملتبس، اختر السجل» — وقد جرّبته أولًا ثم رفضته، لأن من كتب «محمد» غالبًا لا يملك سوى هذا الاسم؛ فإخباره بأن الاسم ملتبس لا يعطيه خطوة تالية. والحل الذي اعتمدته أن يردّ النظام بثلاثة أشياء معًا: يعلن العدد، ويشرح كيف يُضيَّق البحث («اكتب الاسم الثلاثي كاملًا أو رقم الوثيقة»)، ويعرض المطابقين ليُحسم الأمر بنقرة. أي أن النظام لا يخبر المستخدم بأنه فشل، بل يعلّمه كيف ينجح. وهذا مغطّى باختبارات، من بينها اختبار يتحقق أن الاسم الثلاثي الكامل يعيد فعلًا شخصًا واحدًا — لأن النصيحة يجب أن تكون قابلة للتنفيذ لا مجرد كلام مهذّب.
+المرحلة الثالثة، الترجيح بالنقاط، وهي ألطف جزئية في التصميم: النيّة لا تجيب بنعم أو لا، بل بدرجة ثقة تساوي عدد الإشارات المستقلة التي التقطتها من السؤال. ثم تفوز صاحبة الدرجة الأعلى، وترتيب السجل يفصل بين متساويتين.
 
-الحالة الثانية، وهي عيب حقيقي اكتشفته وأصلحته، وأعرضها بصراحة لأنها تُظهر منهج التفكير: حين يُسأل النظام «كم عدد السكان في مخيم الزعتري؟» ولا يوجد مخيم بهذا الاسم، كان الكود القديم يعامل النتيجة كأن المستخدم لم يذكر مخيمًا أصلًا، فيحسب إجمالي جميع المخيمات ويعرضه. والنتيجة رقم صحيح حسابيًا وخاطئ تمامًا في معناه — والمستخدم يظنه إجابة عن سؤاله. وجذر المشكلة أنني كنت أمثّل حالتين مختلفتين بقيمة null واحدة: «لم يُذكر مخيم» و«ذُكر مخيم غير موجود». والحل أن أنشأت صنفًا خاصًا (CampReference) يمثّل ثلاث حالات صراحةً: لا مخيم، أو مخيم موجود، أو مخيم مذكور وغير موجود. وبهذا أصبح المبرمج مضطرًا لمعالجة الحالة الثالثة، ولم تعد تسقط صامتة. والرد اليوم: «لا يوجد مخيم بهذا الاسم» مع عرض قائمة المخيمات المسجّلة فعلًا — لأن السبب الأغلب اختلاف في التسمية، وعرض الأسماء الحقيقية يحلّ المشكلة في خطوة واحدة. ولاحظوا أن النظام يعيد الاسم بالإملاء الذي كتبه المستخدم لا بصورته المعالَجة.
+المرحلة الرابعة، التنفيذ: تستخرج النيّة الفائزة الاسم أو الرقم من السؤال بعد حذف كلماتها المفتاحية وكلمات الوقف، ثم تُنفَّذ الاستعلام الجاهز.
 
-الحالة الثالثة: التمييز بين «لم أجد» و«صفر». الإجابة الفارغة ليست خطأ: سؤال «كم لاجئًا بلا سكن؟» قد تكون إجابته الصحيحة صفرًا — وهذا خبر جيد. لذلك يفرّق النظام بين ثلاث نبرات: إجابة عادية، وفارغة، وخطأ فعلي. ولكل نبرة شكل مختلف في الواجهة، فلا يقرأ المستخدم عطلًا على أنه نتيجة، ولا نتيجة صحيحة على أنها عطل.
+والآن المثالان، وهما جوهر الشريحة. انظروا إلى السؤالين: «أين يسكن أحمد الحسن؟» و«كم شخصًا بلا سكن؟». كلاهما يحتوي كلمة «سكن». لكن الأول سؤال عن شخص بعينه، والثاني إحصاء عن المخيم كله.
 
-الحالة الرابعة: السؤال غير المفهوم. حين لا تطالب أي نيّة بالسؤال لا يستسلم النظام، بل يمرّر النص إلى البحث الشامل في اللاجئين والأسر والوحدات والمخيمات — لأن أكثر ما يُكتب في صندوق الحوار ليس سؤالًا أصلًا بل اسم مجرّد. فإن وُجد ما يطابقه عُرضت السجلات؛ وإن لم يوجد، اعترف النظام بعدم فهمه وعرض أمثلة على أسئلة يفهمها، مُفلترة حسب دور المستخدم، بل وتذكر اسم مخيم موجود فعلًا في قاعدة البيانات حتى لا نقترح سؤالًا سيُرفض.
+في السؤال الأول تطالب نيّة حالة السكن بدرجة ثلاثة، وتنسحب نيّة غير المسكّنين لأن عبارتها غير موجودة.
 
-وأخيرًا شبكة الأمان: التقاط الاستثناءات. كل ما سبق معالجةٌ لأخطاء توقّعتها. لكن ماذا عن الخطأ الذي لم أتوقعه؟ عمودٌ حُذف، أو اتصال انقطع، أو ثغرة أدخلها تعديل مستقبلي؟ في التطبيق العادي ينتج عن ذلك صفحة Error 500 — وهي في صندوق حوار كارثة مضاعفة: المستخدم لا يفهم ما جرى، وقد تتسرّب في رسالة الخطأ تفاصيل عن بنية قاعدة البيانات تفيد المهاجم. لذلك أحطتُ نقطة الدخول كاملة بـ try/catch يلتقط Throwable — أي كل خطأ واستثناء دون استثناء. وعند وقوع أي عطل يحدث أمران معًا: للمستخدم جملة عربية لبقة تقترح خطوة بديلة، بحالة HTTP 200 لأن الطلب وصل وعولج، ودون أي تفصيل تقني. وللمطوّر يُكتب في السجل الاستثناء كاملًا ومعه نص السؤال الذي سبّبه ومُعرِّف المستخدم. وهذه النقطة جوهرية: الخطأ يُخفى عن المستخدم ولا يُبتلع.
+وفي السؤال الثاني تفوز نيّة غير المسكّنين بدرجة ثلاثة، بينما تنسحب نيّة حالة السكن انسحابًا صريحًا: برمجتها أن تعيد لا شيء فور رؤية أدوات العدّ — «كم»، «عدد»، «إحصائية». لأنها لو لم تنسحب لالتقطت كلمة «سكن» وأجابت عن سؤال آخر.
 
-وهذا السلوك نفسه مغطّى باختبارين: أحدهما يفتعل عطلًا ويتحقق أن الاستجابة 200 لا 500، وأن كلمة الخطأ التقنية لم تظهر في استجابة المتصفح. والآخر يتحقق أن السؤال المتسبّب سُجِّل فعلًا في سجل الأخطاء.
+وهذا بالضبط ما لا يستطيعه «أول تطابق»: لو أخذنا أول نيّة تجد كلمتها، لأجاب النظام إجابة خاطئة بثقة تامة. والنقاط هي ما يجعل السؤال يذهب إلى صاحبه.
 
-[أداء] الحالة الثانية هي أقوى ما تملك أمام لجنة هندسية: تعترف بعيب في تصميمك وتشرح جذره وحلّه. لا تحذفها عند الاختصار. الزمن: 3 دقائق.`);
+[أداء] هذه الشريحة هي ردّك على سؤال «أليس هذا بدائيًا؟». الزمن: 2 دقيقة.`);
   }
 
-  // ============================ 8. CONCLUSION ============================
+  // ==================== 12. GRACEFUL DEGRADATION — REAL REPLIES ====================
   {
     const s = pres.addSlide();
-    s.background = { color: DARK };
-    s.addShape(pres.ShapeType.ellipse, { x: 11.5, y: -2.35, w: 3.6, h: 3.6, fill: { color: DARK2 } });
-    s.addText('الخاتمة', rtl({ x: M, y: 0.42, w: W - 2 * M, h: 0.3, fontSize: 13, bold: true, color: AMBER, charSpacing: 1 }));
-    s.addText('الخلاصة والتطلعات', rtl({ x: M, y: 0.76, w: W - 2 * M, h: 0.6, fontSize: 34, bold: true, color: WHITE }));
-
-    const colw = (W - 2 * M - 0.4) / 2;
-    // right column: delivered
-    s.addText('ما أُنجز', rtl({ x: W - M - colw, y: 1.62, w: colw, h: 0.34, fontSize: 16, bold: true, color: SEA }));
-    ['نظام متكامل بـ ٦ وحدات و٧ أدوار', 'مساعد ذكي بالعربية دون نموذج لغوي خارجي', '٢٦٢ اختبارًا آليًا وتكامل مستمر', 'معالجة صريحة للحالات الحرجة'].forEach((t, i) => {
-      const y = 2.12 + i * 0.72;
-      s.addShape(pres.ShapeType.roundRect, { x: W - M - colw, y, w: colw, h: 0.58, fill: { color: DARK2 }, rectRadius: 0.08 });
-      s.addShape(pres.ShapeType.ellipse, { x: W - M - 0.62, y: y + 0.15, w: 0.28, h: 0.28, fill: { color: SEA } });
-      s.addImage({ data: ic.check_w, x: W - M - 0.55, y: y + 0.22, w: 0.14, h: 0.14 });
-      s.addText(t, rtl({ x: W - M - colw + 0.22, y, w: colw - 0.95, h: 0.58, fontSize: 12.5, color: WHITE, valign: 'middle' }));
+    s.background = { color: P.LIGHT };
+    heading(s, 'التدهور الآمن — ردود حقيقية من النظام', 'المحور الخامس · المتانة');
+    const pw = (W - 2 * M - 0.35) / 2;
+    const panels = [
+      ['الحالة ١ · اسم ملتبس', 'أين يسكن محمد',
+        '٣ أشخاص يطابقون «محمد». اكتب الاسم الثلاثي كاملًا أو رقم الوثيقة لتحديد الشخص، أو اختر من القائمة:',
+        [['محمد سالم العلي', 'مخيم السلام · غرفة U-983'], ['محمد خالد الحسن', 'مخيم السلام · غرفة U-983'], ['محمد أمين الرشيد', 'مخيم السلام · غرفة U-983']], 1.0],
+      ['الحالة ٢ · مخيم غير موجود', 'كم عدد السكان في مخيم الزعتري؟',
+        'لا يوجد مخيم باسم «الزعتري» في النظام. المخيمات المسجّلة حاليًا:',
+        [['مخيم السلام', 'عنيزة · فعال'], ['مخيم النور', 'بريدة · فعال']], 0.78],
+    ];
+    panels.forEach((p, k) => {
+      const x = k === 0 ? W - M - pw : M;
+      const y = 1.72;
+      card(s, x, y, pw, 4.34);
+      T(s, p[0], { x: x + 0.26, y: y + 0.18, w: pw - 0.52, h: 0.3, fontSize: 12, bold: true, color: k === 0 ? 'B4761C' : P.TEAL });
+      s.addShape(pres.ShapeType.roundRect, { x: x + pw - 0.26 - (pw - 1.2), y: y + 0.6, w: pw - 1.2, h: 0.5, fill: { color: P.DARK }, rectRadius: 0.14 });
+      T(s, p[1], { x: x + pw - 0.42 - (pw - 1.2), y: y + 0.6, w: pw - 1.5, h: 0.5, fontSize: 11.5, color: P.WHITE, valign: 'middle' });
+      s.addShape(pres.ShapeType.roundRect, { x: x + 0.26, y: y + 1.24, w: pw - 0.52, h: p[4], fill: { color: P.TINT_T }, rectRadius: 0.12 });
+      T(s, p[2], { x: x + 0.44, y: y + 1.24, w: pw - 0.88, h: p[4], fontSize: 11, color: P.INK, valign: 'middle', lineSpacing: 15 });
+      p[3].forEach((r, i) => {
+        const ry = y + 1.24 + p[4] + 0.16 + i * 0.6;
+        s.addShape(pres.ShapeType.roundRect, { x: x + 0.26, y: ry, w: pw - 0.52, h: 0.5, fill: { color: P.LIGHT }, rectRadius: 0.06 });
+        T(s, r[0], { x: x + 0.44, y: ry + 0.05, w: pw - 0.88, h: 0.24, fontSize: 11, bold: true, color: P.INK });
+        T(s, r[1], { x: x + 0.44, y: ry + 0.27, w: pw - 0.88, h: 0.22, fontSize: 9.5, color: P.MUTED });
+      });
     });
-    // left column: future
-    s.addText('التطوير المستقبلي', rtl({ x: M, y: 1.62, w: colw, h: 0.34, fontSize: 16, bold: true, color: AMBER }));
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 6.22, w: W - 2 * M, h: 0.82, fill: { color: P.DARK }, rectRadius: 0.09 });
+    T(s, 'وحالتان أخريان: «لم أجد» تُقال بنبرة تختلف عن «صفر»، والسؤال غير المفهوم يُمرَّر إلى البحث الشامل ثم تُعرض أمثلة يفهمها النظام',
+      { x: M + 0.3, y: 6.22, w: W - 2 * M - 0.6, h: 0.82, fontSize: 11.5, color: P.PALE, valign: 'middle', align: 'center' });
+    s.addNotes(`هذه ليست رسومًا توضيحية — هذه ردود النظام الفعلية، نسختها من مخرجات تشغيل حقيقي.
+
+الحالة الأولى: الاسم الملتبس. في مخيم فيه آلاف الأشخاص، اسم «محمد» يطابق العشرات. الخطأ الفادح أن يختار النظام الأول ويجيب بثقة، فيُعطي عنوان شخص آخر. وهذا في سياق إنساني ليس خطأً تقنيًا فقط، بل قد يكون خطرًا على شخص.
+
+والحل الناقص أن يقول «الاسم ملتبس، اختر السجل». وقد جرّبته أولًا ثم رفضته، لأن من كتب «محمد» غالبًا لا يملك سوى هذا الاسم؛ فإخباره بأن الاسم ملتبس لا يعطيه خطوة تالية.
+
+والحل الذي اعتمدته تروْنه على اليمين: النظام يعلن العدد، ويشرح كيف يُضيَّق البحث — «اكتب الاسم الثلاثي كاملًا أو رقم الوثيقة» — ثم يعرض المطابقين ليُحسم الأمر بنقرة. أي أن النظام لا يخبر المستخدم بأنه فشل، بل يعلّمه كيف ينجح. وهناك اختبار يتحقق أن الاسم الثلاثي الكامل يعيد فعلًا شخصًا واحدًا، لأن النصيحة يجب أن تكون قابلة للتنفيذ لا مجرد كلام مهذّب.
+
+الحالة الثانية على اليسار، وهي عيب حقيقي اكتشفته وأصلحته، وأعرضها بصراحة لأنها تُظهر منهج التفكير: حين يُسأل النظام عن مخيم لا وجود له، كان الكود القديم يعامل النتيجة كأن المستخدم لم يذكر مخيمًا أصلًا، فيحسب إجمالي جميع المخيمات ويعرضه. والنتيجة رقم صحيح حسابيًا وخاطئ تمامًا في معناه، والمستخدم يظنه إجابة عن سؤاله.
+
+وجذر المشكلة أنني كنت أمثّل حالتين مختلفتين بقيمة فارغة واحدة: «لم يُذكر مخيم» و«ذُكر مخيم غير موجود». والحل أن أنشأت صنفًا خاصًا يمثّل ثلاث حالات صراحةً: لا مخيم، أو مخيم موجود، أو مخيم مذكور وغير موجود. وبهذا أصبح المبرمج مضطرًا لمعالجة الحالة الثالثة، ولم تعد تسقط صامتة.
+
+والرد اليوم كما ترون: يصرّح بعدم وجود المخيم، ثم يعرض المخيمات المسجّلة فعلًا — لأن السبب الأغلب اختلاف في التسمية، وعرض الأسماء الحقيقية يحلّ المشكلة في خطوة واحدة. ولاحظوا أن النظام يعيد الاسم بالإملاء الذي كتبه المستخدم لا بصورته المعالَجة.
+
+وحالتان أخريان في الشريط السفلي: الإجابة الفارغة ليست خطأ — «كم لاجئًا بلا سكن؟» قد تكون إجابته الصحيحة صفرًا، وهذا خبر جيد؛ لذلك يفرّق النظام بين ثلاث نبرات ولكل نبرة شكل مختلف. والسؤال غير المفهوم يُمرَّر إلى البحث الشامل، لأن أكثر ما يُكتب في صندوق الحوار ليس سؤالًا بل اسم مجرّد.
+
+[أداء] هذه أقوى شريحة تملكها أمام لجنة هندسية: تعترف بعيب في تصميمك وتشرح جذره وحلّه. الزمن: 2.5 دقيقة.`);
+  }
+
+  // ==================== 13. EXCEPTION HANDLING ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.LIGHT };
+    heading(s, 'معالجة الاستثناءات — شبكة الأمان الأخيرة', 'المحور الخامس · المتانة');
+    const cw2 = 6.5;
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 1.72, w: cw2, h: 3.62, fill: { color: P.DARK }, rectRadius: 0.1 });
+    TL(s, 'AssistantController::ask()', { x: M + 0.3, y: 1.88, w: cw2 - 0.6, h: 0.26, fontSize: 10, bold: true, color: P.SEA });
+    [['try {', P.PALE], ['    $answer = $this->assistant', P.WHITE], ['        ->ask($question, $request->user())', P.WHITE],
+     ['        ->toArray();', P.WHITE], ['} catch (Throwable $e) {', P.AMBER], ["    Log::error('Assistant failed to answer', [", P.WHITE],
+     ["        'question'  => $question,", P.WHITE], ["        'user_id'   => $request->user()?->id,", P.WHITE],
+     ["        'exception' => $e,", P.WHITE], ['    ]);', P.WHITE], ['', P.WHITE],
+     ['    $answer = Answer::failed(/* ... */)', P.SEA], ['        ->toArray();', P.SEA], ['}', P.PALE],
+    ].forEach((l, i) => {
+      TL(s, l[0], { x: M + 0.3, y: 2.24 + i * 0.222, w: cw2 - 0.6, h: 0.22, fontSize: 9.5, color: l[1], fontFace: MONO });
+    });
+    const ox = W - M - 5.3, ow = 5.3;
+    [['للمستخدم', 'جملة عربية لبقة تقترح خطوة بديلة، بحالة HTTP 200، ودون أي تفصيل تقني', P.SEA],
+     ['للمطوّر', 'الاستثناء كاملًا في السجل، ومعه نص السؤال الذي سبّبه ومُعرِّف المستخدم', P.AMBER]].forEach((o, i) => {
+      const y = 1.72 + i * 1.12;
+      card(s, ox, y, ow, 1.0);
+      dot(s, ox + ow - 0.58, y + 0.16, 0.32, o[2]);
+      s.addImage({ data: i === 0 ? IC.check : IC.bug, x: ox + ow - 0.5, y: y + 0.24, w: 0.16, h: 0.16 });
+      T(s, o[0], { x: ox + 0.24, y: y + 0.14, w: ow - 0.95, h: 0.28, fontSize: 13.5, bold: true, color: P.INK });
+      T(s, o[1], { x: ox + 0.24, y: y + 0.45, w: ow - 0.5, h: 0.45, fontSize: 11, color: P.MUTED, lineSpacing: 14 });
+    });
+    card(s, ox, 3.96, ow, 1.38);
+    T(s, 'ما يراه المستخدم', { x: ox + 0.24, y: 4.1, w: ow - 0.48, h: 0.26, fontSize: 10.5, bold: true, color: P.TEAL });
+    s.addShape(pres.ShapeType.roundRect, { x: ox + 0.24, y: 4.42, w: ow - 0.48, h: 0.76, fill: { color: 'FBEDE8' }, rectRadius: 0.12 });
+    T(s, 'تعذّر إعداد الإجابة على هذا السؤال. جرّب صياغة أبسط، أو استخدم البحث من الشريط العلوي.',
+      { x: ox + 0.42, y: 4.42, w: ow - 0.84, h: 0.76, fontSize: 10.5, color: '8C3A1E', valign: 'middle', lineSpacing: 14 });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.56, w: W - 2 * M, h: 1.3, fill: { color: P.DARK }, rectRadius: 0.1 });
+    T(s, 'والسلوك نفسه مُثبَت باختبارين، لا بالكلام', { x: M + 0.3, y: 5.72, w: W - 2 * M - 0.6, h: 0.3, fontSize: 13, bold: true, color: P.SEA, align: 'center' });
+    const tw2 = (W - 2 * M - 0.9) / 2;
+    [['يفتعل عطلًا داخل المساعد، ويتحقق أن الاستجابة 200 لا 500، وأن كلمة الخطأ التقنية لم تصل إلى المتصفح'],
+     ['يتحقق أن السؤال المتسبّب سُجِّل فعلًا في سجل الأخطاء مع مُعرِّف المستخدم']].forEach((t, i) => {
+      const x = i === 0 ? W - M - 0.3 - tw2 : M + 0.3;
+      T(s, '• ' + t[0], { x, y: 6.1, w: tw2, h: 0.6, fontSize: 10.5, color: P.PALE, lineSpacing: 14 });
+    });
+    s.addNotes(`كل ما عرضته في الشريحة السابقة معالجةٌ لأخطاء توقّعتها. لكن ماذا عن الخطأ الذي لم أتوقعه؟ عمودٌ حُذف، أو اتصال بقاعدة البيانات انقطع، أو ثغرة أدخلها تعديل مستقبلي؟
+
+في التطبيق العادي ينتج عن ذلك صفحة خطأ 500. وهي في صندوق حوار كارثة مضاعفة: المستخدم لا يفهم ما جرى، وقد تتسرّب في رسالة الخطأ تفاصيل عن بنية قاعدة البيانات تفيد المهاجم.
+
+لذلك أحطتُ نقطة الدخول كاملة بـ try و catch يلتقط Throwable — أي كل خطأ واستثناء دون استثناء، وليس فئة معينة منها. وترون الشيفرة الفعلية على اليسار.
+
+وعند وقوع أي عطل يحدث أمران معًا، وهذه النقطة جوهرية:
+
+للمستخدم: جملة عربية لبقة تقترح خطوة بديلة — «تعذّر إعداد الإجابة على هذا السؤال. جرّب صياغة أبسط، أو استخدم البحث من الشريط العلوي». بحالة 200 لأن الطلب وصل وعولج، ودون أي تفصيل تقني.
+
+وللمطوّر: يُكتب في سجل الأخطاء الاستثناء كاملًا، ومعه نص السؤال الذي سبّبه ومُعرِّف المستخدم. أي أن الخطأ يُخفى عن المستخدم ولا يُبتلع. فالمشكلة تصل إلى المطوّر بكل ما يلزم لإعادة إنتاجها وإصلاحها، وهذا هو الفرق بين إخفاء الخطأ وابتلاعه.
+
+ولاحظوا الشريط السفلي: هذا السلوك ليس ادّعاءً في عرض تقديمي، بل مُثبَت باختبارين آليين. الأول يفتعل عطلًا داخل المساعد ويتحقق أن الاستجابة 200 لا 500، وأن كلمة الخطأ التقنية لم تظهر في استجابة المتصفح. والثاني يتحقق أن السؤال المتسبّب سُجِّل فعلًا في سجل الأخطاء.
+
+والخلاصة في جملة: المساعد قد يعجز عن الإجابة، لكنه لا ينهار، ولا يخترع إجابة، ولا يفشل بصمت.
+
+الزمن: 2 دقيقة.`);
+  }
+
+  // ==================== 14. TESTING ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.LIGHT };
+    heading(s, 'الاختبار وضمان الجودة', 'المحور السادس · البرهان');
+    const tw3 = 7.0;
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 1.72, w: tw3, h: 4.2, fill: { color: '0C1E22' }, rectRadius: 0.1 });
+    [['$ vendor/bin/phpunit', P.SEA], ['', P.WHITE],
+     ['PHPUnit 11.5.56 by Sebastian Bergmann.', P.PALE], ['', P.WHITE],
+     ['Runtime:       PHP 8.4.19', P.PALE], ['Configuration: phpunit.xml', P.PALE], ['', P.WHITE],
+     ['...............................................  63 / 284 ( 22%)', P.WHITE],
+     ['............................................... 126 / 284 ( 44%)', P.WHITE],
+     ['............................................... 189 / 284 ( 66%)', P.WHITE],
+     ['............................................... 252 / 284 ( 88%)', P.WHITE],
+     ['...............................                 284 / 284 (100%)', P.WHITE], ['', P.WHITE],
+     ['Time: 00:06.900, Memory: 78.50 MB', P.PALE], ['', P.WHITE],
+     ['OK (284 tests, 883 assertions)', '5BD98A'],
+    ].forEach((l, i) => {
+      TL(s, l[0], { x: M + 0.32, y: 1.98 + i * 0.245, w: tw3 - 0.64, h: 0.24, fontSize: 9.5, bold: i === 15, color: l[1], fontFace: MONO });
+    });
+    const bx = W - M - 4.8, bw = 4.8;
+    T(s, 'أين تتركّز التغطية', { x: bx, y: 1.72, w: bw, h: 0.3, fontSize: 13, bold: true, color: P.TEAL });
+    const groups = [['المساعد الذكي', '50', P.AMBER], ['خدمات المجال', '28', P.TEAL], ['الترشيح والقوائم', '28', P.TEAL],
+                    ['البحث العربي والفهرسة', '22', P.TEAL], ['التحقق من المدخلات', '13', P.TEAL], ['الصلاحيات والمصادقة', '11', P.TEAL]];
+    groups.forEach((g, i) => {
+      const y = 2.14 + i * 0.62;
+      card(s, bx, y, bw, 0.52);
+      T(s, g[0], { x: bx + 0.24, y, w: bw - 1.2, h: 0.52, fontSize: 11.5, color: P.INK, valign: 'middle' });
+      s.addShape(pres.ShapeType.roundRect, { x: bx + bw - 0.92, y: y + 0.09, w: 0.68, h: 0.34, fill: { color: g[2] }, rectRadius: 0.08 });
+      TL(s, g[1], { x: bx + bw - 0.92, y: y + 0.09, w: 0.68, h: 0.34, fontSize: 11.5, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+    });
+    s.addShape(pres.ShapeType.roundRect, { x: bx, y: 5.9, w: bw, h: 0.96, fill: { color: P.DARK }, rectRadius: 0.09 });
+    T(s, 'تعمل آليًا عند كل رفع', { x: bx + 0.24, y: 6.02, w: bw - 0.48, h: 0.28, fontSize: 12, bold: true, color: P.SEA });
+    T(s, 'GitHub Actions يفحص التنسيق ثم يشغّل المجموعة كاملة قبل أي دمج', { x: bx + 0.24, y: 6.32, w: bw - 0.48, h: 0.44, fontSize: 10.5, color: P.PALE, lineSpacing: 14 });
+    T(s, 'الاختبارات تعمل على قاعدة بيانات في الذاكرة تُنشأ من الصفر عند كل تشغيل، فلا تعتمد على بيانات سابقة',
+      { x: M, y: 6.08, w: tw3, h: 0.5, fontSize: 10.5, color: P.MUTED, align: 'center', lineSpacing: 14 });
+    s.addNotes(`هذه ليست صورة من الإنترنت — هذه مخرجات تشغيل المجموعة على هذا المشروع، وقد شغّلتها قبل هذا العرض.
+
+284 اختبارًا، 883 تأكيدًا، تعمل كلها في أقل من سبع ثوانٍ، والنتيجة: OK. أي لا فشل ولا اختبار متجاوَز.
+
+ولماذا هذا مهم في مشروع تخرّج؟ لأن أي أحد يستطيع أن يقول في عرض تقديمي «النظام يعالج الأخطاء» أو «الصلاحيات مضبوطة». الاختبار هو ما يحوّل الادّعاء إلى برهان: إن كسرت الصلاحيات غدًا، يسقط اختبار ويخبرني قبل أن يكتشفها مستخدم.
+
+وانظروا أين تتركّز التغطية على اليمين: خمسون اختبارًا للمساعد الذكي وحده — وهو أكثر جزء مُختبَر في النظام كله، لأنه الجزء الذي يتعامل مع نص حر كتبه إنسان، وهو أكثر ما يمكن أن يسوء. ثم ثمانية وعشرون لخدمات المجال، ومثلها للترشيح والقوائم، واثنان وعشرون للبحث العربي والفهرسة، وثلاثة عشر للتحقق من المدخلات، وأحد عشر للصلاحيات والمصادقة.
+
+ونقطة تقنية: الاختبارات تعمل على قاعدة بيانات في الذاكرة تُنشأ من الصفر عند كل تشغيل. أي أنها لا تعتمد على بيانات موجودة مسبقًا، وتعطي النتيجة نفسها على أي جهاز — وهذا شرط أن تكون ذات معنى.
+
+وأخيرًا، هذه المجموعة ليست شيئًا أشغّله يدويًا حين أتذكّر: GitHub Actions يشغّلها آليًا عند كل رفع، ويفحص تنسيق الكود قبلها. فلا يدخل إلى الفرع الرئيسي كودٌ يكسر اختبارًا.
+
+[أداء] إن سألوك «كيف تضمن أن ما تقوله يعمل؟» — أشِر إلى هذه الشريحة. الزمن: 1.5 دقيقة.`);
+  }
+
+  // ==================== 15. CONCLUSION ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.DARK };
+    s.addShape(pres.ShapeType.ellipse, { x: 11.5, y: -2.35, w: 3.6, h: 3.6, fill: { color: P.DARK2 } });
+    heading(s, 'الخلاصة والتطلعات', 'الخاتمة', true);
+    const colw = (W - 2 * M - 0.4) / 2;
+    T(s, 'ما أُنجز', { x: W - M - colw, y: 1.62, w: colw, h: 0.34, fontSize: 16, bold: true, color: P.SEA });
+    ['نظام متكامل بست وحدات وسبعة أدوار', 'مساعد ذكي بالعربية دون نموذج لغوي خارجي', '284 اختبارًا آليًا وتكامل مستمر', 'معالجة صريحة للحالات الحرجة'].forEach((t, i) => {
+      const y = 2.12 + i * 0.72;
+      s.addShape(pres.ShapeType.roundRect, { x: W - M - colw, y, w: colw, h: 0.58, fill: { color: P.DARK2 }, rectRadius: 0.08 });
+      dot(s, W - M - 0.62, y + 0.15, 0.28, P.SEA);
+      s.addImage({ data: IC.check, x: W - M - 0.55, y: y + 0.22, w: 0.14, h: 0.14 });
+      T(s, t, { x: W - M - colw + 0.22, y, w: colw - 0.95, h: 0.58, fontSize: 12.5, color: P.WHITE, valign: 'middle' });
+    });
+    T(s, 'التطوير المستقبلي', { x: M, y: 1.62, w: colw, h: 0.34, fontSize: 16, bold: true, color: P.AMBER });
     ['تطبيق جوّال للبوابات بمسح الباركود', 'دعم متعدد اللغات', 'لوحات تحليلية ومؤشرات إنذار مبكر', 'واجهات تكامل مع المنظمات الإنسانية'].forEach((t, i) => {
       const y = 2.12 + i * 0.72;
-      s.addShape(pres.ShapeType.roundRect, { x: M, y, w: colw, h: 0.58, fill: { color: DARK2 }, rectRadius: 0.08 });
-      s.addShape(pres.ShapeType.ellipse, { x: M + colw - 0.62, y: y + 0.15, w: 0.28, h: 0.28, fill: { color: AMBER } });
-      s.addImage({ data: ic.arrow_w, x: M + colw - 0.55, y: y + 0.22, w: 0.14, h: 0.14 });
-      s.addText(t, rtl({ x: M + 0.22, y, w: colw - 0.95, h: 0.58, fontSize: 12.5, color: WHITE, valign: 'middle' }));
+      s.addShape(pres.ShapeType.roundRect, { x: M, y, w: colw, h: 0.58, fill: { color: P.DARK2 }, rectRadius: 0.08 });
+      dot(s, M + colw - 0.62, y + 0.15, 0.28, P.AMBER);
+      s.addImage({ data: IC.arrow, x: M + colw - 0.55, y: y + 0.22, w: 0.14, h: 0.14 });
+      T(s, t, { x: M + 0.22, y, w: colw - 0.95, h: 0.58, fontSize: 12.5, color: P.WHITE, valign: 'middle' });
     });
-
-    s.addText('شكرًا لحسن استماعكم', rtl({ x: M, y: 5.42, w: W - 2 * M, h: 0.6, fontSize: 32, bold: true, color: WHITE, align: 'center' }));
-    s.addText('يسعدني أن أستمع إلى أسئلتكم وملاحظاتكم', rtl({ x: M, y: 6.12, w: W - 2 * M, h: 0.4, fontSize: 15, color: SEA, align: 'center' }));
-
+    T(s, 'شكرًا لحسن استماعكم', { x: M, y: 5.72, w: W - 2 * M, h: 0.6, fontSize: 32, bold: true, color: P.WHITE, align: 'center' });
+    T(s, 'يسعدني أن أستمع إلى أسئلتكم وملاحظاتكم', { x: M, y: 6.42, w: W - 2 * M, h: 0.4, fontSize: 15, color: P.SEA, align: 'center' });
     s.addNotes(`أختم بثلاث نقاط موجزة.
 
-أولًا، ما أُنجز: نظام متكامل يغطي دورة حياة اللاجئ داخل المخيم — من التسجيل إلى السكن إلى المساعدات إلى حركة الدخول والخروج — بستّ وحدات مترابطة وسبعة أدوار بصلاحيات دقيقة، مبني على Laravel وMySQL، ومغطّى بـ 262 اختبارًا آليًا تعمل عند كل تعديل.
+أولًا، ما أُنجز: نظام متكامل يغطي دورة حياة اللاجئ داخل المخيم — من التسجيل إلى السكن إلى المساعدات إلى حركة الدخول والخروج — بست وحدات مترابطة وسبعة أدوار بصلاحيات دقيقة، مبني على Laravel وMySQL، ومغطّى بـ 284 اختبارًا آليًا تعمل عند كل تعديل.
 
 ثانيًا، ما أعتبره الإسهام الحقيقي للمشروع: ليس عدد الشاشات، بل أمران. الأول هو المساعد الذكي بالعربية الذي يوصل الموظف إلى المعلومة بجملة واحدة، ويعمل داخل الخادم بالكامل دون إرسال بيانات اللاجئين إلى أي جهة خارجية — وهو ما يجعله صالحًا للتشغيل في بيئة إنسانية حقيقية، لا في العرض التجريبي فقط. والثاني هو التدهور الآمن: أن يتعامل النظام مع الاسم الملتبس، والمخيم غير الموجود، والنتيجة الفارغة، والخطأ غير المتوقع — بردود واضحة، دون أن ينهار ودون أن يخترع.
 
 ثالثًا، آفاق التطوير: تطبيق جوّال لضباط البوابات يسجّل الحركة بمسح باركود البطاقة بدل الإدخال اليدوي. ودعم متعدد اللغات، والبنية جاهزة له لأن كل النصوص مركزية. ولوحات تحليلية تكشف المؤشرات مبكرًا — كاكتظاظ متصاعد في وحدة، أو تأخر في متابعة طبية. وواجهات تكامل مع أنظمة المنظمات الإنسانية لتبادل البيانات بأمان.
 
-وفي الختام، أشكر أستاذي المشرف [الاسم] على متابعته وتوجيهه، وأشكر لجنة التحكيم الموقّرة على وقتها واهتمامها. والآن يسعدني أن أستمع إلى أسئلتكم وملاحظاتكم.
+وفي الختام، أشكر أستاذي المشرف على متابعته وتوجيهه، وأشكر لجنة التحكيم الموقّرة على وقتها واهتمامها. والآن يسعدني أن أستمع إلى أسئلتكم وملاحظاتكم.
 
 [أداء] اختم ثم اصمت وانظر إلى اللجنة. لا تُتبعها باعتذار ولا بجملة زائدة. الزمن: 1.5 دقيقة.`);
   }
 
   await pres.writeFile({ fileName: process.argv[2] || 'camp-management.pptx' });
-  console.log('written');
+  console.log('written: 15 slides');
 }
 
 build().catch((e) => { console.error(e); process.exit(1); });
