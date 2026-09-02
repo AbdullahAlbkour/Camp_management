@@ -29,6 +29,7 @@ class AidController extends Controller
             ],
             'rows' => Organization::latest()->paginate(20),
             'editRoute' => 'aid.organizations.edit',
+            'deleteResource' => 'organizations',
         ]);
     }
 
@@ -75,6 +76,7 @@ class AidController extends Controller
             ],
             'rows' => AidType::with('organization')->latest()->paginate(20),
             'editRoute' => 'aid.types.edit',
+            'deleteResource' => 'aid_types',
         ]);
     }
 

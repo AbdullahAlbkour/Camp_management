@@ -24,6 +24,7 @@ class MedicalController extends Controller
             ],
             'rows' => MedicalService::latest()->paginate(20),
             'editRoute' => 'medical.services.edit',
+            'deleteResource' => 'medical_services',
         ]);
     }
 

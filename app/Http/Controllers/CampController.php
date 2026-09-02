@@ -27,6 +27,7 @@ class CampController extends Controller
             ],
             'rows' => $rows,
             'editRoute' => 'camps.edit',
+            'deleteResource' => 'camps',
         ]);
     }
 

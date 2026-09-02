@@ -41,6 +41,11 @@
                         <a class="icon-link" href="{{ route('households.show', $household) }}" title="ملف الأسرة"><i data-lucide="eye"></i></a>
                         @role('admin','registration_officer')
                             <a class="icon-link" href="{{ route('households.edit', $household) }}" title="تعديل"><i data-lucide="pencil"></i></a>
+                            @include('partials.archive-button', [
+                                'resource' => 'households',
+                                'id' => $household->id,
+                                'label' => $household->household_code,
+                            ])
                         @endrole
                     </td>
                 </tr>

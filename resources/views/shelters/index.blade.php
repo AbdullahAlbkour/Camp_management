@@ -55,6 +55,11 @@
                     <td class="actions">
                         @role('admin','housing_officer')
                             <a class="icon-link" href="{{ route('shelters.edit', $shelter) }}" title="تعديل"><i data-lucide="pencil"></i></a>
+                            @include('partials.archive-button', [
+                                'resource' => 'shelters',
+                                'id' => $shelter->id,
+                                'label' => $shelter->display_name,
+                            ])
                         @endrole
                     </td>
                 </tr>

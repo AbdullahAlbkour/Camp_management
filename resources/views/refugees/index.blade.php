@@ -48,6 +48,11 @@
                         <a class="icon-link" href="{{ route('refugees.show', $refugee) }}" title="ملف اللاجئ"><i data-lucide="eye"></i></a>
                         @role('admin','registration_officer')
                             <a class="icon-link" href="{{ route('refugees.edit', $refugee) }}" title="تعديل"><i data-lucide="pencil"></i></a>
+                            @include('partials.archive-button', [
+                                'resource' => 'refugees',
+                                'id' => $refugee->id,
+                                'label' => $refugee->full_name,
+                            ])
                         @endrole
                         @role('admin','housing_officer')
                             <a class="icon-link" href="{{ route('housing.transfer.form', $refugee) }}" title="السكن"><i data-lucide="bed"></i></a>

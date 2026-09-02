@@ -132,7 +132,19 @@ class HouseholdController extends Controller
             'model' => $household,
             'fields' => [
                 ['name' => 'household_code', 'label' => 'رمز الأسرة', 'type' => 'text', 'required' => true],
-                ['name' => 'head_of_household_id', 'label' => 'رب الأسرة', 'type' => 'select', 'options' => Refugee::orderBy('first_name')->get()->pluck('full_name', 'id')],
+                // Typed rather than picked from a list: the list held every
+                // refugee in the system, which is thousands of options rendered
+                // into one <select> and unusable long before that. The lookup
+                // searches by name, document number or phone and still resolves
+                // to a real record, because the column is a foreign key.
+                [
+                    'name' => 'head_of_household_id',
+                    'label' => 'رب الأسرة',
+                    'type' => 'async-refugee',
+                    'url' => route('lookups.refugees'),
+                    'placeholder' => 'ابحث بالاسم أو رقم الوثيقة أو الهاتف',
+                    'display' => $household->head?->full_name,
+                ],
                 ['name' => 'status', 'label' => 'الحالة', 'type' => 'select', 'required' => true, 'options' => ['active' => 'فعالة', 'archived' => 'مؤرشفة']],
                 ['name' => 'notes', 'label' => 'ملاحظات', 'type' => 'textarea'],
             ],

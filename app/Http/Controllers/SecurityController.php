@@ -30,6 +30,7 @@ class SecurityController extends Controller
             ],
             'rows' => Checkpoint::with('camp')->latest()->paginate(20),
             'editRoute' => 'security.checkpoints.edit',
+            'deleteResource' => 'checkpoints',
         ]);
     }
 

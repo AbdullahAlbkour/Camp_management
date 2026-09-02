@@ -2843,3 +2843,21 @@ th.sortable a:hover { background: rgba(15, 23, 42, 0.04); }
 @media print {
     .assistant { display: none; }
 }
+
+/* Destructive actions read as destructive.
+
+   `.danger-link` alone loses to `.icon-link` and `.secondary`, which set their
+   own colour further down the file, so the delete button rendered in the same
+   ink as edit. Two classes outrank one, whatever the source order. */
+.icon-link.danger-link,
+.secondary.danger-link,
+.icon-button.danger-link {
+    color: var(--danger);
+}
+
+.icon-link.danger-link:hover,
+.secondary.danger-link:hover,
+.icon-button.danger-link:hover {
+    border-color: rgba(180, 35, 24, .35);
+    background: rgba(180, 35, 24, .06);
+}
