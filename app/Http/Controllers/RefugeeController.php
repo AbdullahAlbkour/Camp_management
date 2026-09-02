@@ -8,6 +8,7 @@ use App\Models\Camp;
 use App\Models\Household;
 use App\Models\Refugee;
 use App\Models\Shelter;
+use App\Services\ArchiveService;
 use App\Services\AuditLogService;
 use App\Services\HousingService;
 use App\Services\RefugeeRegistrationService;
@@ -123,5 +124,24 @@ class RefugeeController extends Controller
         });
 
         return redirect()->route('refugees.show', $refugee)->with('success', 'تم تعديل بيانات اللاجئ.');
+    }
+
+    /**
+     * Archive a refugee record.
+     *
+     * Delegated to ArchiveService rather than calling delete() here: that
+     * service already refuses to archive someone still assigned to a unit,
+     * writes the audit entry inside the same transaction, and is what the
+     * archive screen restores from. A second delete path would drift from it.
+     */
+    public function destroy(Request $request, Refugee $refugee, ArchiveService $archive): RedirectResponse
+    {
+        $name = $refugee->full_name;
+
+        $archive->archive($refugee, $request->input('reason'));
+
+        return redirect()
+            ->route('refugees.index')
+            ->with('success', 'تمت أرشفة سجل '.$name.'. يمكن استرجاعه من صفحة الأرشيف.');
     }
 }

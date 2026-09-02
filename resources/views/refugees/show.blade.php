@@ -14,6 +14,25 @@
             <a class="primary" href="{{ route('housing.transfer.form', $refugee) }}"><i data-lucide="bed"></i><span>السكن</span></a>
         @endrole
         <a class="secondary" target="_blank" href="{{ route('refugees.card', $refugee) }}"><i data-lucide="id-card"></i><span>بطاقة التعريف</span></a>
+        @role('admin','registration_officer')
+            {{-- The confirm says where the record goes, because it is archived
+                 rather than erased and the wording is what the user acts on. --}}
+            @php
+                $confirmMessage = 'سيُنقل سجل '.$refugee->full_name
+                    .' إلى الأرشيف ويمكن استرجاعه لاحقًا.'."\n\n".'هل تريد المتابعة؟';
+            @endphp
+            {{-- Js::from and not string interpolation: {{ }} escapes for HTML,
+                 and the attribute is decoded again before the JS runs, so an
+                 apostrophe in a name would close the string literal and leave
+                 the button dead. UNESCAPED_UNICODE keeps the Arabic readable in
+                 the source; the quote characters are still escaped. --}}
+            <form method="post" action="{{ route('refugees.destroy', $refugee) }}"
+                  onsubmit="return confirm({{ Js::from($confirmMessage, JSON_UNESCAPED_UNICODE) }});">
+                @csrf
+                @method('DELETE')
+                <button class="secondary danger-link" type="submit"><i data-lucide="trash-2"></i><span>حذف</span></button>
+            </form>
+        @endrole
     </div>
 </section>
 

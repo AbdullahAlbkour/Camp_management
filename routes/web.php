@@ -71,6 +71,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/refugees/{refugee}/attachments', [AttachmentController::class, 'store'])->name('refugees.attachments.store')->middleware('role:admin,registration_officer,medical_officer');
     Route::get('/refugees/{refugee}/edit', [RefugeeController::class, 'edit'])->name('refugees.edit')->middleware('role:admin,registration_officer');
     Route::put('/refugees/{refugee}', [RefugeeController::class, 'update'])->name('refugees.update')->middleware('role:admin,registration_officer');
+    Route::delete('/refugees/{refugee}', [RefugeeController::class, 'destroy'])->name('refugees.destroy')->middleware('role:admin,registration_officer');
 
     Route::get('/households', [HouseholdController::class, 'index'])->name('households.index');
     Route::get('/households/create', [HouseholdController::class, 'create'])->name('households.create')->middleware('role:admin,registration_officer');
