@@ -1,6 +1,7 @@
 // The strategic deck: the project as an idea and a value proposition, not as a codebase.
 // Deliberately carries no screenshots and no schema/controller/test detail — the
-// engineering deck (presentation-deck.cjs) is where that lives.
+// engineering deck (presentation-deck.cjs) is where that lives. The three closing
+// slides are backup: they are not presented, they are turned to when the panel asks.
 const pptxgen = require('pptxgenjs');
 const { icon } = require('./presentation-icons.cjs');
 const { P, F, MONO, W, H, M, ar, rtl, ltr, shadow } = require('./presentation-lib.cjs');
@@ -17,10 +18,28 @@ const TL = (s, text, o) => s.addText(text, ltr(o));
 const card = (s, x, y, w, h, fill) =>
   s.addShape(pres.ShapeType.roundRect, { x, y, w, h, fill: { color: fill || P.CARD }, rectRadius: 0.09, shadow: fill && fill !== P.CARD ? undefined : shadow() });
 const dot = (s, x, y, d, fill) => s.addShape(pres.ShapeType.ellipse, { x, y, w: d, h: d, fill: { color: fill } });
+const rule = (s, x, y, w, color) => s.addShape(pres.ShapeType.rect, { x, y, w, h: 0.018, fill: { color } });
 
+// Every content slide is laid out inside this band, so the footer is never crowded.
+const TOP = 1.76, BOTTOM = 6.8;
+const MAIN = '١٠'; // slides 1..10 are the talk; 11..13 are backup
+
+// A heading with an accent bar, a kicker, and a hairline that closes the header band.
 function heading(s, text, kicker, dark) {
-  T(s, kicker, { x: M, y: 0.42, w: W - 2 * M, h: 0.3, fontSize: 13, bold: true, color: dark ? P.AMBER : P.TEAL, charSpacing: 1 });
-  T(s, text, { x: M, y: 0.76, w: W - 2 * M, h: 0.62, fontSize: 33, bold: true, color: dark ? P.WHITE : P.INK });
+  s.addShape(pres.ShapeType.rect, { x: W - M - 0.055, y: 0.5, w: 0.055, h: 0.3, fill: { color: dark ? P.AMBER : P.TEAL } });
+  T(s, kicker, { x: M, y: 0.47, w: W - 2 * M - 0.18, h: 0.3, fontSize: 12.5, bold: true, color: dark ? P.AMBER : P.TEAL, charSpacing: 1 });
+  T(s, text, { x: M, y: 0.82, w: W - 2 * M, h: 0.64, fontSize: 34, bold: true, color: dark ? P.WHITE : P.INK });
+  rule(s, M, 1.54, W - 2 * M, dark ? P.DARK3 : P.LINE);
+}
+
+// Running footer: the deck identifies itself on every slide, and the panel always
+// knows how far along the talk is.
+function footer(s, n, dark, backup) {
+  rule(s, M, 6.96, W - 2 * M, dark ? P.DARK3 : P.LINE);
+  T(s, 'نظام إدارة المخيمات  ·  مشروع فصلي  ·  جامعة الشمال الخاصة',
+    { x: W - M - 7.5, y: 7.04, w: 7.5, h: 0.28, fontSize: 9.5, color: P.MUTED });
+  T(s, backup ? 'شريحة احتياطية' : MAIN + ' / ' + n,
+    { x: M, y: 7.04, w: 3.0, h: 0.28, fontSize: 9.5, bold: true, color: dark ? P.PALE : P.TEAL, align: 'left' });
 }
 
 async function build() {
@@ -30,6 +49,7 @@ async function build() {
     check: 'FaCheck', arrow: 'FaArrowLeft', globe: 'FaGlobeAfrica', mobile: 'FaMobileAlt',
     hands: 'FaHandshake', lock: 'FaLock', scale: 'FaBalanceScale', warn: 'FaExclamationTriangle',
     id: 'FaIdCard', seed: 'FaSeedling', door: 'FaDoorOpen', search: 'FaSearch', copy: 'FaClone',
+    layers: 'FaLayerGroup', code: 'FaCode', map: 'FaMapSigns',
   };
   for (const [k, v] of Object.entries(want)) {
     IC[k] = await icon(v, P.WHITE);
@@ -40,29 +60,32 @@ async function build() {
   {
     const s = pres.addSlide();
     s.background = { color: P.DARK };
-    s.addShape(pres.ShapeType.ellipse, { x: -1.6, y: 3.1, w: 5.6, h: 5.6, fill: { color: P.DARK2 } });
-    dot(s, 0.66, 1.5, 2.6, P.TEAL);
-    s.addImage({ data: IC.house, x: 1.5, y: 2.36, w: 0.92, h: 0.92 });
+    s.addShape(pres.ShapeType.ellipse, { x: -1.7, y: 2.9, w: 6.0, h: 6.0, fill: { color: P.DARK2 } });
+    dot(s, 0.72, 1.42, 2.7, P.TEAL);
+    s.addImage({ data: IC.house, x: 1.62, y: 2.32, w: 0.96, h: 0.96 });
 
-    const cx = 4.4, cw = W - 4.4 - M;
-    T(s, 'مشروع فصلي', { x: cx, y: 1.22, w: cw, h: 0.32, fontSize: 14, bold: true, color: P.SEA, charSpacing: 2 });
-    T(s, 'نظام إدارة المخيمات', { x: cx, y: 1.6, w: cw, h: 0.95, fontSize: 46, bold: true, color: P.WHITE });
-    TL(s, 'Camp Management System', { x: cx, y: 2.58, w: cw, h: 0.4, fontSize: 19, color: P.PALE, align: 'right' });
-    s.addShape(pres.ShapeType.roundRect, { x: cx, y: 3.16, w: cw, h: 0.66, fill: { color: P.DARK2 }, rectRadius: 0.1 });
+    const cx = 4.55, cw = W - 4.55 - M;
+    s.addShape(pres.ShapeType.rect, { x: W - M - 0.06, y: 1.16, w: 0.06, h: 0.3, fill: { color: P.SEA } });
+    T(s, 'مشروع فصلي', { x: cx, y: 1.13, w: cw - 0.2, h: 0.32, fontSize: 13.5, bold: true, color: P.SEA, charSpacing: 2 });
+    T(s, 'نظام إدارة المخيمات', { x: cx, y: 1.5, w: cw, h: 0.98, fontSize: 47, bold: true, color: P.WHITE });
+    TL(s, 'Camp Management System', { x: cx, y: 2.5, w: cw, h: 0.4, fontSize: 19, color: P.PALE, align: 'right' });
+    rule(s, cx, 3.06, cw, P.DARK3);
     T(s, 'من السجل الورقي المبعثر إلى قرار إداري مبني على معلومة لحظية',
-      { x: cx + 0.24, y: 3.16, w: cw - 0.48, h: 0.66, fontSize: 14.5, color: P.SEA, bold: true, valign: 'middle' });
+      { x: cx, y: 3.24, w: cw, h: 0.44, fontSize: 16, bold: true, color: P.SEA });
 
-    T(s, 'إعداد الطلاب', { x: cx, y: 4.2, w: cw, h: 0.3, fontSize: 12, bold: true, color: P.SEA, charSpacing: 1 });
-    T(s, 'عبد الله أحمد البكور\nأحمد خالد الفاضل\nمحمد أحمد خطيب',
-      { x: cx, y: 4.56, w: cw, h: 1.05, fontSize: 14.5, bold: true, color: P.WHITE, lineSpacing: 23 });
-    T(s, 'إشراف: المهندسة لبنى الأنيس', { x: cx, y: 5.72, w: cw, h: 0.32, fontSize: 13.5, color: P.PALE });
-    T(s, 'جامعة الشمال الخاصة', { x: cx, y: 6.1, w: cw, h: 0.3, fontSize: 13, color: P.PALE });
+    T(s, 'إعداد الطلاب', { x: cx, y: 4.06, w: cw, h: 0.3, fontSize: 11.5, bold: true, color: P.MUTED, charSpacing: 1.5 });
+    ['عبد الله أحمد البكور', 'أحمد خالد الفاضل', 'محمد أحمد خطيب'].forEach((n, i) => {
+      T(s, n, { x: cx, y: 4.42 + i * 0.4, w: cw, h: 0.36, fontSize: 15, bold: true, color: P.WHITE });
+    });
+    rule(s, cx, 5.74, cw, P.DARK3);
+    T(s, 'إشراف: المهندسة لبنى الأنيس', { x: cx, y: 5.92, w: cw, h: 0.32, fontSize: 14, color: P.PALE });
+    T(s, 'جامعة الشمال الخاصة', { x: cx, y: 6.3, w: cw, h: 0.3, fontSize: 13, color: P.PALE });
 
     let px = W - M;
     ['Laravel', 'MySQL', 'Web'].forEach((c) => {
-      px -= 1.34;
-      s.addShape(pres.ShapeType.roundRect, { x: px, y: 6.62, w: 1.34, h: 0.42, fill: { color: P.DARK2 }, line: { color: P.TEAL, width: 1 }, rectRadius: 0.21 });
-      TL(s, c, { x: px, y: 6.62, w: 1.34, h: 0.42, fontSize: 11.5, bold: true, color: P.SEA, align: 'center', valign: 'middle' });
+      px -= 1.3;
+      s.addShape(pres.ShapeType.roundRect, { x: px, y: 6.8, w: 1.3, h: 0.4, fill: { color: P.DARK2 }, line: { color: P.DARK3, width: 1 }, rectRadius: 0.2 });
+      TL(s, c, { x: px, y: 6.8, w: 1.3, h: 0.4, fontSize: 11, bold: true, color: P.PALE, align: 'center', valign: 'middle' });
       px -= 0.16;
     });
 
@@ -70,20 +93,64 @@ async function build() {
 
 نحن عبد الله البكور، وأحمد الفاضل، ومحمد خطيب، ونقدّم اليوم مشروعنا الفصلي «نظام إدارة المخيمات»، بإشراف المهندسة لبنى الأنيس، في جامعة الشمال الخاصة.
 
-وقبل أن نبدأ، نودّ أن نوضّح زاوية العرض. هذا المشروع مكتوب بلغة برمجية وقاعدة بيانات، لكننا لن نعرضه اليوم بوصفه شيفرة. سنعرضه بوصفه فكرة لها مشكلة تحلّها وجمهور يستفيد منها.
+وقبل أن نبدأ، نودّ أن نوضّح زاوية العرض. هذا المشروع مكتوب بلغة برمجية وقاعدة بيانات، وقد بُني ويعمل فعلًا. لكننا لن نعرضه اليوم بوصفه شيفرة. سنعرضه بوصفه فكرة لها مشكلة تحلّها وجمهور يستفيد منها.
 
-لأن السؤال الذي يهمّ في النهاية ليس «بأي تقنية بُني؟»، بل «ماذا يتغيّر في المخيم إن استُخدم؟».
+لأن السؤال الذي يهمّ في النهاية ليس «بأي تقنية بُني؟»، بل «ماذا يتغيّر في المخيم إن استُخدم؟». وقد أعددنا للجانب التقني شرائح احتياطية في آخر العرض، نعود إليها إن أحببتم.
 
 والجملة التي تختصر المشروع كله هي المكتوبة أمامكم: نقل إدارة المخيم من سجل ورقي مبعثر، إلى قرار إداري مبني على معلومة لحظية موثوقة.
 
-[أداء] لا تقرأ الشريحة. عرّف بنفسك وبزميليك، واذكر عنوان المشروع والمشرفة، ثم انتقل. الزمن: 45 ثانية.`);
+[أداء] قف على يمين الشاشة. لا تقرأ الشريحة. عرّف بنفسك وبزميليك، واذكر عنوان المشروع والمشرفة، ثم انتقل. الزمن: 45 ثانية.`);
   }
 
-  // ==================== 2. THE PROBLEM ====================
+  // ==================== 2. AGENDA ====================
   {
     const s = pres.addSlide();
     s.background = { color: P.LIGHT };
-    heading(s, 'المشكلة والحاجة الملحّة', 'لماذا هذا المشروع');
+    heading(s, 'محاور العرض', 'خريطة الطريق');
+    const parts = [
+      ['١', 'الإطار', 'المشكلة في إدارة المخيمات، والفكرة التي نقترحها', '٣ و٤', P.TEAL],
+      ['٢', 'القيمة', 'ما الذي يتغيّر فعلًا، ومن المستفيد منه', '٥ و٦', P.TEAL],
+      ['٣', 'النظام', 'ما يفعله عمليًا، والميزة التي تميّزه', '٧ و٨', P.AMBER],
+      ['٤', 'المستقبل', 'الرؤية والاستدامة، ثم الخاتمة', '٩ و١٠', P.AMBER],
+    ];
+    const pw = (W - 2 * M - 3 * 0.26) / 4;
+    parts.forEach((p, i) => {
+      const x = W - M - pw - i * (pw + 0.26);
+      card(s, x, TOP + 0.2, pw, 2.86);
+      dot(s, x + pw - 1.02, TOP + 0.46, 0.74, p[4]);
+      T(s, p[0], { x: x + pw - 1.02, y: TOP + 0.46, w: 0.74, h: 0.74, fontSize: 24, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+      s.addShape(pres.ShapeType.roundRect, { x: x + 0.28, y: TOP + 0.62, w: 1.05, h: 0.36, fill: { color: P.TINT_T }, rectRadius: 0.06 });
+      T(s, 'شريحة ' + p[3], { x: x + 0.28, y: TOP + 0.62, w: 1.05, h: 0.36, fontSize: 9, bold: true, color: P.TEAL, align: 'center', valign: 'middle' });
+      T(s, p[1], { x: x + 0.28, y: TOP + 1.44, w: pw - 0.56, h: 0.42, fontSize: 19, bold: true, color: P.INK });
+      T(s, p[2], { x: x + 0.28, y: TOP + 1.94, w: pw - 0.56, h: 0.86, fontSize: 11.5, color: P.MUTED, lineSpacing: 16 });
+    });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.24, w: W - 2 * M, h: 1.4, fill: { color: P.DARK }, rectRadius: 0.1 });
+    T(s, 'ثلاث شرائح احتياطية في آخر العرض للجانب التقني: التقنيات المستخدمة، وآلية عمل المساعد، وحدود المشروع الحالية',
+      { x: M + 0.4, y: 5.44, w: W - 2 * M - 0.8, h: 0.44, fontSize: 13, color: P.SEA, bold: true, align: 'center' });
+    T(s, 'الزمن التقديري للعرض: ثلاث عشرة دقيقة، ثم الأسئلة',
+      { x: M + 0.4, y: 5.94, w: W - 2 * M - 0.8, h: 0.4, fontSize: 11.5, color: P.PALE, align: 'center' });
+    footer(s, '٢');
+
+    s.addNotes(`العرض في أربعة محاور، وسنمرّ عليها في ثلاث عشرة دقيقة تقريبًا.
+
+المحور الأول، الإطار: ما المشكلة في إدارة المخيمات اليوم، وما الفكرة التي نقترحها لحلّها.
+
+المحور الثاني، القيمة: ما الذي يتغيّر فعلًا حين يُستخدم النظام، ومن المستفيد من هذا التغيّر.
+
+المحور الثالث، النظام: ما يفعله عمليًا، والميزة التي نعتبرها الأبرز فيه.
+
+المحور الرابع، المستقبل: إلى أين يمضي المشروع، ولماذا نعدّه قابلًا للاستدامة، ثم الخاتمة.
+
+ونودّ أن ننبّه إلى أمر: أعددنا ثلاث شرائح احتياطية في آخر العرض للجانب التقني — التقنيات المستخدمة، وآلية عمل المساعد الذكي، وحدود المشروع الحالية. لم نضعها في المسار الأساسي لأن العرض اليوم عن الفكرة لا عن الشيفرة، لكنها جاهزة متى شئتم.
+
+[أداء] أربعون ثانية. لا تشرح المحاور، اذكرها فقط ليعرف الحاضر أين هو من العرض. وأشِر إلى الشرائح الاحتياطية بثقة، فهي تُظهر استعدادًا لا اعتذارًا.`);
+  }
+
+  // ==================== 3. THE PROBLEM ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.LIGHT };
+    heading(s, 'المشكلة والحاجة الملحّة', 'المحور الأول · لماذا هذا المشروع');
     const probs = [
       [IC.paper, 'سجلّات ورقية مبعثرة', 'دفاتر وجداول متفرقة لا يعرف أحد أيّها الأحدث، وسجلّ واحد تالف يعني أسرة بلا إثبات وجود'],
       [IC.copy, 'ازدواجية وتضارب', 'الأسرة الواحدة تُسجَّل مرتين باسمين مختلفين، فتُحسب مرتين في التقارير ومرة واحدة عند التوزيع'],
@@ -93,15 +160,15 @@ async function build() {
     const pw = (W - 2 * M - 3 * 0.24) / 4;
     probs.forEach((p, i) => {
       const x = W - M - pw - i * (pw + 0.24);
-      card(s, x, 1.7, pw, 2.62);
-      dot(s, x + pw - 0.92, 1.98, 0.56, i < 2 ? P.RED : P.AMBER);
-      s.addImage({ data: p[0], x: x + pw - 0.78, y: 2.12, w: 0.28, h: 0.28 });
-      T(s, p[1], { x: x + 0.24, y: 2.06, w: pw - 1.2, h: 0.42, fontSize: 13.5, bold: true, color: P.INK, lineSpacing: 17 });
-      T(s, p[2], { x: x + 0.24, y: 2.6, w: pw - 0.48, h: 1.56, fontSize: 11, color: P.MUTED, lineSpacing: 16 });
+      card(s, x, TOP, pw, 2.5);
+      dot(s, x + pw - 0.9, TOP + 0.26, 0.54, i < 2 ? P.RED : P.AMBER);
+      s.addImage({ data: p[0], x: x + pw - 0.77, y: TOP + 0.39, w: 0.28, h: 0.28 });
+      T(s, p[1], { x: x + 0.24, y: TOP + 0.32, w: pw - 1.18, h: 0.42, fontSize: 13.5, bold: true, color: P.INK, lineSpacing: 17 });
+      T(s, p[2], { x: x + 0.24, y: TOP + 0.86, w: pw - 0.48, h: 1.44, fontSize: 11, color: P.MUTED, lineSpacing: 16 });
     });
 
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 4.58, w: W - 2 * M, h: 1.68, fill: { color: P.DARK }, rectRadius: 0.1 });
-    T(s, 'وما يترتّب على ذلك ليس خللًا إداريًا فحسب', { x: M + 0.4, y: 4.78, w: W - 2 * M - 0.8, h: 0.34, fontSize: 13.5, bold: true, color: P.SEA });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 4.46, w: W - 2 * M, h: 1.62, fill: { color: P.DARK }, rectRadius: 0.1 });
+    T(s, 'وما يترتّب على ذلك ليس خللًا إداريًا فحسب', { x: M + 0.4, y: 4.62, w: W - 2 * M - 0.8, h: 0.34, fontSize: 13.5, bold: true, color: P.SEA });
     const cons = [
       ['حقوق تضيع', 'من لا يظهر في السجلّ لا يصله شيء'],
       ['قرارات على التخمين', 'الاحتياج يُقدَّر تقديرًا لا يُحسب'],
@@ -111,13 +178,14 @@ async function build() {
     const cw2 = (W - 2 * M - 0.8 - 3 * 0.3) / 4;
     cons.forEach((c, i) => {
       const x = W - M - 0.4 - cw2 - i * (cw2 + 0.3);
-      s.addShape(pres.ShapeType.roundRect, { x, y: 5.24, w: cw2, h: 0.82, fill: { color: P.DARK2 }, rectRadius: 0.08 });
-      T(s, c[0], { x: x + 0.2, y: 5.32, w: cw2 - 0.4, h: 0.3, fontSize: 12.5, bold: true, color: P.WHITE });
-      T(s, c[1], { x: x + 0.2, y: 5.62, w: cw2 - 0.4, h: 0.36, fontSize: 10, color: P.PALE, lineSpacing: 13 });
+      s.addShape(pres.ShapeType.roundRect, { x, y: 5.06, w: cw2, h: 0.84, fill: { color: P.DARK2 }, rectRadius: 0.08 });
+      T(s, c[0], { x: x + 0.2, y: 5.14, w: cw2 - 0.4, h: 0.3, fontSize: 12.5, bold: true, color: P.WHITE });
+      T(s, c[1], { x: x + 0.2, y: 5.44, w: cw2 - 0.4, h: 0.38, fontSize: 10, color: P.PALE, lineSpacing: 13 });
     });
 
     T(s, 'المخيم ليس مكانًا للإقامة فحسب؛ هو منظومة خدمات يومية. وأي منظومة خدمات بلا بيانات موثوقة تتحوّل إلى اجتهاد فردي',
-      { x: M, y: 6.5, w: W - 2 * M, h: 0.5, fontSize: 12.5, color: P.INK, align: 'center', lineSpacing: 17 });
+      { x: M, y: 6.28, w: W - 2 * M, h: 0.46, fontSize: 12.5, color: P.INK, align: 'center', lineSpacing: 17 });
+    footer(s, '٣');
 
     s.addNotes(`لنبدأ من الواقع الذي دفعنا إلى هذا المشروع.
 
@@ -135,17 +203,19 @@ async function build() {
 
 فالمخيم ليس مكانًا للإقامة فحسب؛ هو منظومة خدمات يومية. وأي منظومة خدمات بلا بيانات موثوقة تتحوّل إلى اجتهاد فردي، يصيب حينًا ويخطئ أحيانًا.
 
+[سؤال متوقّع] «ما مصدر هذا التوصيف؟» — الجواب الصادق: بُني على قراءتنا في أدبيات الإدارة الإنسانية وعلى منطق العمليات نفسه، لا على دراسة ميدانية أجريناها. لا تدّعِ ما لم تفعل.
+
 [أداء] هذه أهمّ شريحة في العرض؛ إن اقتنعت اللجنة بالمشكلة اقتنعت بالحلّ. تحدّث ببطء، ولا تسرد النقاط سردًا. الزمن: دقيقتان.`);
   }
 
-  // ==================== 3. THE IDEA ====================
+  // ==================== 4. THE IDEA ====================
   {
     const s = pres.addSlide();
     s.background = { color: P.LIGHT };
-    heading(s, 'فكرة المشروع', 'ما الحلّ الذي نقدّمه');
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 1.66, w: W - 2 * M, h: 1.0, fill: { color: P.DARK }, rectRadius: 0.1 });
+    heading(s, 'فكرة المشروع', 'المحور الأول · ما الحلّ الذي نقدّمه');
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: TOP, w: W - 2 * M, h: 0.94, fill: { color: P.DARK }, rectRadius: 0.1 });
     T(s, 'سجلّ مركزي واحد يرافق اللاجئ من لحظة وصوله إلى كل خدمة يتلقّاها',
-      { x: M + 0.4, y: 1.66, w: W - 2 * M - 0.8, h: 1.0, fontSize: 19, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+      { x: M + 0.4, y: TOP, w: W - 2 * M - 0.8, h: 0.94, fontSize: 19, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
 
     const pillars = [
       [IC.id, 'هوية واحدة لا تتكرّر', 'يُسجَّل الشخص مرة واحدة برقم وثيقة فريد، ويُبنى عليه كل ما يليه: سكنه وأسرته ومساعداته وحركته. فلا نسخة ثانية ولا سجلّ يتيم'],
@@ -155,23 +225,24 @@ async function build() {
     const pw = (W - 2 * M - 2 * 0.3) / 3;
     pillars.forEach((p, i) => {
       const x = W - M - pw - i * (pw + 0.3);
-      card(s, x, 2.94, pw, 2.5);
-      dot(s, x + pw - 0.9, 3.16, 0.64, i === 2 ? P.AMBER : P.TEAL);
-      s.addImage({ data: p[0], x: x + pw - 0.74, y: 3.32, w: 0.32, h: 0.32 });
-      T(s, p[1], { x: x + 0.26, y: 3.92, w: pw - 0.52, h: 0.38, fontSize: 15, bold: true, color: P.INK });
-      T(s, p[2], { x: x + 0.26, y: 4.36, w: pw - 0.52, h: 0.96, fontSize: 11.5, color: P.MUTED, lineSpacing: 17 });
+      card(s, x, 2.9, pw, 2.34);
+      dot(s, x + pw - 0.88, 3.1, 0.62, i === 2 ? P.AMBER : P.TEAL);
+      s.addImage({ data: p[0], x: x + pw - 0.73, y: 3.26, w: 0.32, h: 0.32 });
+      T(s, p[1], { x: x + 0.26, y: 3.82, w: pw - 0.52, h: 0.38, fontSize: 15, bold: true, color: P.INK });
+      T(s, p[2], { x: x + 0.26, y: 4.24, w: pw - 0.52, h: 0.86, fontSize: 11.5, color: P.MUTED, lineSpacing: 17 });
     });
 
-    T(s, 'ما الذي يتغيّر جذريًا', { x: M, y: 5.6, w: W - 2 * M, h: 0.3, fontSize: 13, bold: true, color: P.TEAL, align: 'center' });
-    const shifts = [['من الدفتر', 'إلى قاعدة بيانات واحدة'], ['من الجرد اليدوي', 'إلى رقم محدَّث لحظيًا'], ['من الاجتهاد', 'إلى قاعدة يطبّقها النظام']];
+    T(s, 'ما الذي يتغيّر جذريًا', { x: M, y: 5.42, w: W - 2 * M, h: 0.3, fontSize: 13, bold: true, color: P.TEAL, align: 'center' });
+    const shifts = [['من الدفتر', 'إلى قاعدة بيانات واحدة'], ['من الجرد اليدوي', 'إلى رقم محدَّث لحظيًا'], ['من الاجتهاد الفردي', 'إلى قاعدة يطبّقها النظام']];
     const sw = (W - 2 * M - 2 * 0.3) / 3;
     shifts.forEach((sh, i) => {
       const x = W - M - sw - i * (sw + 0.3);
-      s.addShape(pres.ShapeType.roundRect, { x, y: 5.98, w: sw, h: 0.92, fill: { color: P.TINT_T }, rectRadius: 0.08 });
-      T(s, sh[0], { x: x + 0.24, y: 6.08, w: sw - 0.48, h: 0.3, fontSize: 10.5, color: P.MUTED });
-      s.addImage({ data: IC.arrow_t, x: x + sw - 0.44, y: 6.5, w: 0.2, h: 0.16 });
-      T(s, sh[1], { x: x + 0.24, y: 6.4, w: sw - 0.74, h: 0.34, fontSize: 12, bold: true, color: P.TEAL });
+      s.addShape(pres.ShapeType.roundRect, { x, y: 5.8, w: sw, h: 0.9, fill: { color: P.TINT_T }, rectRadius: 0.08 });
+      T(s, sh[0], { x: x + 0.24, y: 5.9, w: sw - 0.48, h: 0.3, fontSize: 10.5, color: P.MUTED });
+      s.addImage({ data: IC.arrow_t, x: x + sw - 0.44, y: 6.3, w: 0.2, h: 0.16 });
+      T(s, sh[1], { x: x + 0.24, y: 6.2, w: sw - 0.74, h: 0.34, fontSize: 12, bold: true, color: P.TEAL });
     });
+    footer(s, '٤');
 
     s.addNotes(`إذن، ما هو النظام؟
 
@@ -192,11 +263,13 @@ async function build() {
 [أداء] هذه شريحة «الفكرة»، فاحرص أن تُفهم الركائز الثلاث. الزمن: دقيقة ونصف.`);
   }
 
-  // ==================== 4. VALUE ====================
+  // ==================== 5. VALUE ====================
   {
     const s = pres.addSlide();
     s.background = { color: P.LIGHT };
-    heading(s, 'أهمية المشروع والقيمة المضافة', 'ماذا يتغيّر فعلًا');
+    heading(s, 'أهمية المشروع والقيمة المضافة', 'المحور الثاني · ماذا يتغيّر فعلًا');
+    T(s, 'الحال اليوم', { x: W - M - 2.85 - 0.24 - 4.05, y: TOP - 0.06, w: 4.05, h: 0.28, fontSize: 10.5, bold: true, color: P.MUTED, align: 'center', charSpacing: 0.5 });
+    T(s, 'مع النظام', { x: W - M - 2.85 - 0.7 - 4.05 - 4.05, y: TOP - 0.06, w: 4.05, h: 0.28, fontSize: 10.5, bold: true, color: P.TEAL, align: 'center', charSpacing: 0.5 });
     const vals = [
       [IC.copy, 'منع الازدواجية', 'اسمان لشخص واحد، وحصّتان لأسرة واحدة', 'رقم وثيقة فريد يرفض التكرار، وبحث عربي يجد «احمد» حين تُكتب «أحمد»', P.TEAL],
       [IC.scale, 'العدالة في التوزيع', 'من يصل أولًا يأخذ، ومن لا يعرف يُحرم', 'سجلّ استلام لكل فرد وأسرة، فيظهر المحروم قبل أن يشتكي', P.AMBER],
@@ -205,22 +278,21 @@ async function build() {
     ];
     const tw = 2.85, aw = 4.05, bw = 4.05;
     vals.forEach((v, i) => {
-      const y = 1.78 + i * 1.2;
-      card(s, M, y, W - 2 * M, 1.02);
+      const y = TOP + 0.32 + i * 1.16;
+      card(s, M, y, W - 2 * M, 1.0);
       const tx = W - M - tw;
-      dot(s, W - M - 0.72, y + 0.28, 0.46, v[4]);
-      s.addImage({ data: v[0], x: W - M - 0.61, y: y + 0.39, w: 0.24, h: 0.24 });
-      T(s, v[1], { x: tx, y, w: tw - 0.9, h: 1.02, fontSize: 14.5, bold: true, color: P.INK, valign: 'middle' });
+      dot(s, W - M - 0.7, y + 0.27, 0.46, v[4]);
+      s.addImage({ data: v[0], x: W - M - 0.59, y: y + 0.38, w: 0.24, h: 0.24 });
+      T(s, v[1], { x: tx, y, w: tw - 0.88, h: 1.0, fontSize: 14.5, bold: true, color: P.INK, valign: 'middle' });
       const ax = tx - 0.24 - aw;
-      s.addShape(pres.ShapeType.roundRect, { x: ax, y: y + 0.16, w: aw, h: 0.7, fill: { color: P.TINT_A }, rectRadius: 0.07 });
-      T(s, v[2], { x: ax + 0.18, y: y + 0.16, w: aw - 0.36, h: 0.7, fontSize: 10.5, color: 'A0532F', valign: 'middle', lineSpacing: 14 });
-      s.addImage({ data: IC.arrow_t, x: ax - 0.34, y: y + 0.43, w: 0.22, h: 0.18 });
+      s.addShape(pres.ShapeType.roundRect, { x: ax, y: y + 0.15, w: aw, h: 0.7, fill: { color: P.TINT_A }, rectRadius: 0.07 });
+      T(s, v[2], { x: ax + 0.18, y: y + 0.15, w: aw - 0.36, h: 0.7, fontSize: 10.5, color: 'A0532F', valign: 'middle', lineSpacing: 14 });
+      s.addImage({ data: IC.arrow_t, x: ax - 0.34, y: y + 0.42, w: 0.22, h: 0.18 });
       const bx = ax - 0.46 - bw;
-      s.addShape(pres.ShapeType.roundRect, { x: bx, y: y + 0.16, w: bw, h: 0.7, fill: { color: P.TINT_T }, rectRadius: 0.07 });
-      T(s, v[3], { x: bx + 0.18, y: y + 0.16, w: bw - 0.36, h: 0.7, fontSize: 10.5, bold: true, color: '145A62', valign: 'middle', lineSpacing: 14 });
+      s.addShape(pres.ShapeType.roundRect, { x: bx, y: y + 0.15, w: bw, h: 0.7, fill: { color: P.TINT_T }, rectRadius: 0.07 });
+      T(s, v[3], { x: bx + 0.18, y: y + 0.15, w: bw - 0.36, h: 0.7, fontSize: 10.5, bold: true, color: '145A62', valign: 'middle', lineSpacing: 14 });
     });
-    T(s, 'الحال اليوم', { x: W - M - tw - 0.24 - aw, y: 6.62, w: aw, h: 0.3, fontSize: 11, color: P.MUTED, align: 'center' });
-    T(s, 'مع النظام', { x: W - M - tw - 0.7 - aw - bw, y: 6.62, w: bw, h: 0.3, fontSize: 11, bold: true, color: P.TEAL, align: 'center' });
+    footer(s, '٥');
 
     s.addNotes(`إن كانت الشريحة السابقة عن الفكرة، فهذه عن قيمتها. أربع قيم، وفي كل سطر نضع الحال اليوم مقابل الحال مع النظام.
 
@@ -232,14 +304,14 @@ async function build() {
 
 القيمة الرابعة: الأمان والخصوصية. وهذه مسؤولية أخلاقية لا ميزة تقنية. بيانات اللاجئين حسّاسة بطبيعتها. الدفتر الورقي مفتوح لكل من وصل إليه؛ أما في النظام فلكلّ موظف نطاق يراه بحسب عمله، والموظف الطبي لا يرى سجلّات المساعدات أصلًا. وكل عملية حسّاسة موثَّقة بصاحبها ووقتها.
 
-[أداء] إن كان عندك وقت لشريحة واحدة فقط، فلتكن هذه. الزمن: دقيقتان.`);
+[أداء] إن كان عندك وقت لشريحة واحدة فقط، فلتكن هذه. اقرأ من اليمين إلى اليسار في كل سطر: القيمة، ثم الحال اليوم، ثم ما يصير إليه. الزمن: دقيقتان.`);
   }
 
-  // ==================== 5. AUDIENCE ====================
+  // ==================== 6. AUDIENCE ====================
   {
     const s = pres.addSlide();
     s.background = { color: P.DARK };
-    heading(s, 'الجمهور المستهدف والمستفيدون', 'لمن بُني هذا النظام', true);
+    heading(s, 'الجمهور المستهدف والمستفيدون', 'المحور الثاني · لمن بُني هذا النظام', true);
     const aud = [
       [IC.globe, 'المنظمات الإنسانية', 'تقارير موثَّقة عن التوزيع والتغطية', 'أثر يُبرَّر أمام المانحين، لا تقديرات', P.SEA],
       [IC.chart, 'إدارة المخيم', 'صورة لحظية للسكان والسكن والمخزون', 'تخطيط قائم على أرقام لا على انطباعات', P.SEA],
@@ -249,17 +321,18 @@ async function build() {
     const pw = (W - 2 * M - 3 * 0.26) / 4;
     aud.forEach((a, i) => {
       const x = W - M - pw - i * (pw + 0.26);
-      s.addShape(pres.ShapeType.roundRect, { x, y: 1.72, w: pw, h: 4.05, fill: { color: P.DARK2 }, rectRadius: 0.1 });
-      dot(s, x + pw / 2 - 0.42, 2.06, 0.84, a[4]);
-      s.addImage({ data: i < 2 ? a[0] : a[0], x: x + pw / 2 - 0.2, y: 2.28, w: 0.4, h: 0.4 });
-      T(s, a[1], { x: x + 0.2, y: 3.08, w: pw - 0.4, h: 0.5, fontSize: 15, bold: true, color: P.WHITE, align: 'center', lineSpacing: 19 });
-      s.addShape(pres.ShapeType.roundRect, { x: x + 0.2, y: 3.74, w: pw - 0.4, h: 0.86, fill: { color: P.DARK3 }, rectRadius: 0.07 });
-      T(s, a[2], { x: x + 0.34, y: 3.74, w: pw - 0.68, h: 0.86, fontSize: 11, color: P.WHITE, valign: 'middle', lineSpacing: 15 });
-      T(s, a[3], { x: x + 0.28, y: 4.76, w: pw - 0.56, h: 0.8, fontSize: 10.5, color: P.PALE, lineSpacing: 15 });
+      s.addShape(pres.ShapeType.roundRect, { x, y: TOP, w: pw, h: 3.86, fill: { color: P.DARK2 }, rectRadius: 0.1 });
+      dot(s, x + pw / 2 - 0.42, TOP + 0.3, 0.84, a[4]);
+      s.addImage({ data: a[0], x: x + pw / 2 - 0.2, y: TOP + 0.52, w: 0.4, h: 0.4 });
+      T(s, a[1], { x: x + 0.2, y: TOP + 1.3, w: pw - 0.4, h: 0.5, fontSize: 15, bold: true, color: P.WHITE, align: 'center', lineSpacing: 19 });
+      s.addShape(pres.ShapeType.roundRect, { x: x + 0.2, y: TOP + 1.94, w: pw - 0.4, h: 0.84, fill: { color: P.DARK3 }, rectRadius: 0.07 });
+      T(s, a[2], { x: x + 0.34, y: TOP + 1.94, w: pw - 0.68, h: 0.84, fontSize: 11, color: P.WHITE, valign: 'middle', lineSpacing: 15 });
+      T(s, a[3], { x: x + 0.28, y: TOP + 2.9, w: pw - 0.56, h: 0.8, fontSize: 10.5, color: P.PALE, lineSpacing: 15 });
     });
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 6.02, w: W - 2 * M, h: 1.0, fill: { color: P.DARK2 }, line: { color: P.TEAL, width: 1 }, rectRadius: 0.1 });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.82, w: W - 2 * M, h: 0.94, fill: { color: P.DARK2 }, line: { color: P.TEAL, width: 1 }, rectRadius: 0.1 });
     T(s, 'المستفيد النهائي واحد: الأسرة التي تنتظر دورها. وكل مستوى فوقها إنما يخدم وصول الخدمة إليها في وقتها وبإنصاف',
-      { x: M + 0.4, y: 6.02, w: W - 2 * M - 0.8, h: 1.0, fontSize: 13.5, color: P.SEA, align: 'center', valign: 'middle' });
+      { x: M + 0.4, y: 5.82, w: W - 2 * M - 0.8, h: 0.94, fontSize: 13.5, color: P.SEA, align: 'center', valign: 'middle' });
+    footer(s, '٦', true);
 
     s.addNotes(`لمن بُني هذا النظام؟ لأربع فئات، ولكلٍّ منها مكسب مختلف.
 
@@ -276,11 +349,11 @@ async function build() {
 [أداء] ارفع نبرتك قليلًا عند الفئة الرابعة، فهي التي تُبقي المشروع في ذهن اللجنة. الزمن: دقيقة ونصف.`);
   }
 
-  // ==================== 6. MODULES ====================
+  // ==================== 7. MODULES ====================
   {
     const s = pres.addSlide();
     s.background = { color: P.LIGHT };
-    heading(s, 'الوظائف الأساسية للنظام', 'ماذا يفعل النظام');
+    heading(s, 'الوظائف الأساسية للنظام', 'المحور الثالث · ماذا يفعل النظام');
     const mods = [
       [IC.id, 'التسجيل', 'ملفّ لكل فرد وأسرة برقم وثيقة فريد، وبحث عربي يجد الاسم مهما اختلف إملاؤه', P.TEAL],
       [IC.house, 'السكن', 'خريطة الوحدات وسعتها وإشغالها، والنظام يمنع تجاوز السعة قبل وقوعه', P.TEAL],
@@ -291,16 +364,17 @@ async function build() {
     const pw = (W - 2 * M - 4 * 0.22) / 5;
     mods.forEach((m, i) => {
       const x = W - M - pw - i * (pw + 0.22);
-      card(s, x, 1.74, pw, 3.4);
-      dot(s, x + pw / 2 - 0.38, 2.06, 0.76, m[3]);
-      s.addImage({ data: m[0], x: x + pw / 2 - 0.18, y: 2.26, w: 0.36, h: 0.36 });
-      T(s, m[1], { x: x + 0.18, y: 3.06, w: pw - 0.36, h: 0.36, fontSize: 15.5, bold: true, color: P.INK, align: 'center' });
-      T(s, m[2], { x: x + 0.22, y: 3.58, w: pw - 0.44, h: 1.4, fontSize: 11, color: P.MUTED, align: 'center', lineSpacing: 16 });
+      card(s, x, TOP, pw, 3.2);
+      dot(s, x + pw / 2 - 0.36, TOP + 0.28, 0.72, m[3]);
+      s.addImage({ data: m[0], x: x + pw / 2 - 0.17, y: TOP + 0.46, w: 0.34, h: 0.34 });
+      T(s, m[1], { x: x + 0.18, y: TOP + 1.2, w: pw - 0.36, h: 0.36, fontSize: 15.5, bold: true, color: P.INK, align: 'center' });
+      T(s, m[2], { x: x + 0.22, y: TOP + 1.66, w: pw - 0.44, h: 1.3, fontSize: 11, color: P.MUTED, align: 'center', lineSpacing: 16 });
     });
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.44, w: W - 2 * M, h: 1.72, fill: { color: P.DARK }, rectRadius: 0.1 });
-    T(s, 'والقيمة ليست في الوحدات، بل في ترابطها', { x: M + 0.4, y: 5.62, w: W - 2 * M - 0.8, h: 0.34, fontSize: 14, bold: true, color: P.SEA, align: 'center' });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.2, w: W - 2 * M, h: 1.56, fill: { color: P.DARK }, rectRadius: 0.1 });
+    T(s, 'والقيمة ليست في الوحدات، بل في ترابطها', { x: M + 0.4, y: 5.36, w: W - 2 * M - 0.8, h: 0.34, fontSize: 14, bold: true, color: P.SEA, align: 'center' });
     T(s, 'ملف اللاجئ الواحد يجمع سكنه وأسرته ومساعداته وحركته وسجلّه الطبي في مكان واحد. فسؤال مثل «هل استلمت هذه الأسرة حصّتها هذا الشهر؟» يُجاب من الشاشة نفسها، لا بمراجعة خمسة دفاتر عند خمسة موظفين',
-      { x: M + 0.7, y: 6.04, w: W - 2 * M - 1.4, h: 0.9, fontSize: 12.5, color: P.PALE, align: 'center', valign: 'middle', lineSpacing: 19 });
+      { x: M + 0.7, y: 5.76, w: W - 2 * M - 1.4, h: 0.86, fontSize: 12.5, color: P.PALE, align: 'center', valign: 'middle', lineSpacing: 19 });
+    footer(s, '٧');
 
     s.addNotes(`ننتقل إلى ما يفعله النظام عمليًا. خمس وحدات تغطّي دورة حياة الخدمة داخل المخيم.
 
@@ -319,14 +393,14 @@ async function build() {
 [أداء] لا تُطل في سرد الوحدات؛ اجعل وقتك في جملة الترابط. الزمن: دقيقة ونصف.`);
   }
 
-  // ==================== 7. THE ASSISTANT ====================
+  // ==================== 8. THE ASSISTANT ====================
   {
     const s = pres.addSlide();
     s.background = { color: P.LIGHT };
-    heading(s, 'الابتكار: المساعد الذكي', 'الميزة التي تميّز المشروع');
+    heading(s, 'الابتكار: المساعد الذكي', 'المحور الثالث · الميزة التي تميّز المشروع');
     const qw = 5.9, qx = W - M - qw;
-    card(s, qx, 1.7, qw, 4.35);
-    T(s, 'يسأل الموظف بالعربية كما يتكلّم', { x: qx + 0.26, y: 1.9, w: qw - 0.52, h: 0.34, fontSize: 14, bold: true, color: P.TEAL });
+    card(s, qx, TOP, qw, 4.06);
+    T(s, 'يسأل الموظف بالعربية كما يتكلّم', { x: qx + 0.26, y: TOP + 0.18, w: qw - 0.52, h: 0.34, fontSize: 14, bold: true, color: P.TEAL });
     const qs = [
       'كم عدد السكان في مخيم السلام؟',
       'أين يسكن أحمد الحسن؟',
@@ -335,13 +409,13 @@ async function build() {
       'كم وحدة سكنية فارغة؟',
     ];
     qs.forEach((q, i) => {
-      const y = 2.4 + i * 0.62;
-      s.addShape(pres.ShapeType.roundRect, { x: qx + 0.26, y, w: qw - 0.52, h: 0.5, fill: { color: i % 2 ? P.TINT_T : P.TINT_A }, rectRadius: 0.07 });
-      T(s, q, { x: qx + 0.46, y, w: qw - 0.92, h: 0.5, fontSize: 12, color: P.INK, valign: 'middle' });
+      const y = TOP + 0.66 + i * 0.58;
+      s.addShape(pres.ShapeType.roundRect, { x: qx + 0.26, y, w: qw - 0.52, h: 0.48, fill: { color: i % 2 ? P.TINT_T : P.TINT_A }, rectRadius: 0.07 });
+      T(s, q, { x: qx + 0.46, y, w: qw - 0.92, h: 0.48, fontSize: 12, color: P.INK, valign: 'middle' });
     });
-    s.addShape(pres.ShapeType.roundRect, { x: qx + 0.26, y: 5.52, w: qw - 0.52, h: 0.33, fill: { color: P.DARK }, rectRadius: 0.06 });
+    s.addShape(pres.ShapeType.roundRect, { x: qx + 0.26, y: TOP + 3.5, w: qw - 0.52, h: 0.38, fill: { color: P.DARK }, rectRadius: 0.06 });
     T(s, 'والجواب جملة عربية مفهومة، مبنية على بيانات النظام نفسها',
-      { x: qx + 0.4, y: 5.52, w: qw - 0.8, h: 0.33, fontSize: 10.5, color: P.PALE, valign: 'middle' });
+      { x: qx + 0.4, y: TOP + 3.5, w: qw - 0.8, h: 0.38, fontSize: 10.5, color: P.PALE, valign: 'middle' });
 
     const bx = M, bw = qx - 0.4 - M;
     const bens = [
@@ -351,16 +425,17 @@ async function build() {
       ['يحترم صلاحية السائل', 'لا يكشف ما لا يخصّ عمل الموظف؛ الصلاحية نفسها تحكم المساعد كما تحكم الشاشات', P.AMBER],
     ];
     bens.forEach((b, i) => {
-      const y = 1.7 + i * 1.12;
-      card(s, bx, y, bw, 0.98);
-      dot(s, bx + bw - 0.56, y + 0.16, 0.32, b[2]);
-      T(s, String(i + 1), { x: bx + bw - 0.56, y: y + 0.16, w: 0.32, h: 0.32, fontSize: 12, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
-      T(s, b[0], { x: bx + 0.24, y: y + 0.12, w: bw - 0.95, h: 0.3, fontSize: 13.5, bold: true, color: P.INK });
-      T(s, b[1], { x: bx + 0.24, y: y + 0.44, w: bw - 0.48, h: 0.48, fontSize: 10.5, color: P.MUTED, lineSpacing: 14 });
+      const y = TOP + i * 1.06;
+      card(s, bx, y, bw, 0.94);
+      dot(s, bx + bw - 0.54, y + 0.15, 0.32, b[2]);
+      T(s, String(i + 1), { x: bx + bw - 0.54, y: y + 0.15, w: 0.32, h: 0.32, fontSize: 12, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+      T(s, b[0], { x: bx + 0.24, y: y + 0.1, w: bw - 0.93, h: 0.3, fontSize: 13.5, bold: true, color: P.INK });
+      T(s, b[1], { x: bx + 0.24, y: y + 0.42, w: bw - 0.48, h: 0.46, fontSize: 10.5, color: P.MUTED, lineSpacing: 14 });
     });
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 6.22, w: W - 2 * M, h: 0.86, fill: { color: P.DARK }, rectRadius: 0.09 });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 6.0, w: W - 2 * M, h: 0.76, fill: { color: P.DARK }, rectRadius: 0.09 });
     T(s, 'المكسب الإداري باختصار: المعلومة تتحرّر من الموظف الذي يعرف مكانها، وتصبح متاحة لكل من يحقّ له الاطّلاع عليها',
-      { x: M + 0.4, y: 6.22, w: W - 2 * M - 0.8, h: 0.86, fontSize: 12.5, color: P.PALE, align: 'center', valign: 'middle' });
+      { x: M + 0.4, y: 6.0, w: W - 2 * M - 0.8, h: 0.76, fontSize: 12.5, color: P.PALE, align: 'center', valign: 'middle' });
+    footer(s, '٨');
 
     s.addNotes(`هذه الشريحة عن الميزة التي نعتبرها الأبرز في المشروع: المساعد الذكي.
 
@@ -382,14 +457,16 @@ async function build() {
 
 والخلاصة الإدارية في الشريط الأسفل: المعلومة تتحرّر من الموظف الذي يعرف مكانها، وتصبح متاحة لكل من يحقّ له الاطّلاع عليها.
 
-[أداء] إن سألت اللجنة عن الجانب التقني، اذكر باختصار أنه محرّك لتحليل نيّة السؤال بالعربية، مبنيّ داخل النظام دون الاعتماد على خدمة خارجية — فبيانات اللاجئين لا تغادر النظام. ولا تسترسل. الزمن: دقيقتان.`);
+[سؤال متوقّع] «هل هذا ذكاء اصطناعي؟ وهل تُرسَل البيانات إلى خدمة خارجية؟» — الجواب: لا نستخدم نموذجًا لغويًا خارجيًا، والبيانات لا تغادر خادم النظام. والآلية مشروحة في الشريحة الاحتياطية الثانية إن أحببتم التفصيل.
+
+[أداء] لا تسترسل في التقني هنا مهما أغراك السؤال؛ أحِل إلى الشريحة الاحتياطية. الزمن: دقيقتان.`);
   }
 
-  // ==================== 8. VISION ====================
+  // ==================== 9. VISION ====================
   {
     const s = pres.addSlide();
     s.background = { color: P.LIGHT };
-    heading(s, 'الرؤية المستقبلية والاستدامة', 'إلى أين يمضي المشروع');
+    heading(s, 'الرؤية المستقبلية والاستدامة', 'المحور الرابع · إلى أين يمضي المشروع');
     const road = [
       [IC.mobile, 'تطبيق ميداني', 'قريب المدى', 'تسجيل الحركة والتوزيع من الجهاز المحمول عند البوابة ونقطة التوزيع، وعمل يستمرّ عند انقطاع الشبكة', P.TEAL],
       [IC.hands, 'التكامل مع المنظمات', 'متوسط المدى', 'قناة تبادل آمنة تُغني عن الكشوف المرسلة يدويًا، فتصل التقارير جاهزة وموثَّقة', P.AMBER],
@@ -399,15 +476,15 @@ async function build() {
     const pw = (W - 2 * M - 3 * 0.24) / 4;
     road.forEach((r, i) => {
       const x = W - M - pw - i * (pw + 0.24);
-      card(s, x, 1.72, pw, 3.02);
-      dot(s, x + pw - 0.86, 1.98, 0.5, r[4]);
-      s.addImage({ data: r[0], x: x + pw - 0.73, y: 2.1, w: 0.24, h: 0.24 });
-      T(s, r[2], { x: x + 0.24, y: 1.98, w: pw - 1.2, h: 0.26, fontSize: 9.5, bold: true, color: r[4], charSpacing: 0.5 });
-      T(s, r[1], { x: x + 0.24, y: 2.3, w: pw - 0.9, h: 0.6, fontSize: 14, bold: true, color: P.INK, lineSpacing: 18 });
-      T(s, r[3], { x: x + 0.24, y: 2.86, w: pw - 0.48, h: 1.5, fontSize: 11, color: P.MUTED, lineSpacing: 16 });
+      card(s, x, TOP, pw, 2.9);
+      dot(s, x + pw - 0.84, TOP + 0.22, 0.5, r[4]);
+      s.addImage({ data: r[0], x: x + pw - 0.71, y: TOP + 0.34, w: 0.24, h: 0.24 });
+      T(s, r[2], { x: x + 0.24, y: TOP + 0.22, w: pw - 1.18, h: 0.26, fontSize: 9.5, bold: true, color: r[4], charSpacing: 0.5 });
+      T(s, r[1], { x: x + 0.24, y: TOP + 0.54, w: pw - 0.88, h: 0.6, fontSize: 14, bold: true, color: P.INK, lineSpacing: 18 });
+      T(s, r[3], { x: x + 0.24, y: TOP + 1.2, w: pw - 0.48, h: 1.44, fontSize: 11, color: P.MUTED, lineSpacing: 16 });
     });
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.06, w: W - 2 * M, h: 1.82, fill: { color: P.DARK }, rectRadius: 0.1 });
-    T(s, 'ولماذا نعدّ المشروع قابلًا للاستدامة', { x: M + 0.4, y: 5.26, w: W - 2 * M - 0.8, h: 0.32, fontSize: 13.5, bold: true, color: P.SEA, align: 'center' });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 4.88, w: W - 2 * M, h: 1.86, fill: { color: P.DARK }, rectRadius: 0.1 });
+    T(s, 'ولماذا نعدّ المشروع قابلًا للاستدامة', { x: M + 0.4, y: 5.06, w: W - 2 * M - 0.8, h: 0.32, fontSize: 13.5, bold: true, color: P.SEA, align: 'center' });
     const sus = [
       ['كلفة تشغيل منخفضة', 'مبني على أدوات مفتوحة المصدر، ويعمل على خادم متواضع'],
       ['قابل للتوسعة بالوحدات', 'إضافة وحدة جديدة لا تستدعي إعادة بناء ما قبلها'],
@@ -416,10 +493,11 @@ async function build() {
     const sw = (W - 2 * M - 0.8 - 2 * 0.3) / 3;
     sus.forEach((u, i) => {
       const x = W - M - 0.4 - sw - i * (sw + 0.3);
-      s.addShape(pres.ShapeType.roundRect, { x, y: 5.72, w: sw, h: 0.96, fill: { color: P.DARK2 }, rectRadius: 0.08 });
-      T(s, u[0], { x: x + 0.22, y: 5.82, w: sw - 0.44, h: 0.3, fontSize: 12, bold: true, color: P.WHITE });
-      T(s, u[1], { x: x + 0.22, y: 6.14, w: sw - 0.44, h: 0.46, fontSize: 10, color: P.PALE, lineSpacing: 13 });
+      s.addShape(pres.ShapeType.roundRect, { x, y: 5.52, w: sw, h: 0.98, fill: { color: P.DARK2 }, rectRadius: 0.08 });
+      T(s, u[0], { x: x + 0.22, y: 5.62, w: sw - 0.44, h: 0.3, fontSize: 12, bold: true, color: P.WHITE });
+      T(s, u[1], { x: x + 0.22, y: 5.94, w: sw - 0.44, h: 0.46, fontSize: 10, color: P.PALE, lineSpacing: 13 });
     });
+    footer(s, '٩');
 
     s.addNotes(`ما بنيناه هذا الفصل نعتبره أساسًا صالحًا للبناء عليه، لا نهاية الطريق. والرؤية على أربع مراحل.
 
@@ -436,7 +514,7 @@ async function build() {
 [أداء] لا تَعِد بما لا تستطيع؛ قدّم هذه بوصفها خارطة طريق مدروسة لا أمنيات. الزمن: دقيقة ونصف.`);
   }
 
-  // ==================== 9. CLOSING ====================
+  // ==================== 10. CLOSING ====================
   {
     const s = pres.addSlide();
     s.background = { color: P.DARK };
@@ -450,25 +528,26 @@ async function build() {
     ];
     keys.forEach((k, i) => {
       const x = W - M - kw - i * (kw + 0.3);
-      s.addShape(pres.ShapeType.roundRect, { x, y: 1.66, w: kw, h: 1.5, fill: { color: P.DARK2 }, rectRadius: 0.1 });
-      dot(s, x + kw - 0.68, 1.92, 0.4, i === 2 ? P.AMBER : P.SEA);
-      s.addImage({ data: IC.check, x: x + kw - 0.58, y: 2.02, w: 0.2, h: 0.2 });
-      T(s, k[0], { x: x + 0.24, y: 1.9, w: kw - 1.0, h: 0.34, fontSize: 15, bold: true, color: P.WHITE });
-      T(s, k[1], { x: x + 0.24, y: 2.34, w: kw - 0.48, h: 0.7, fontSize: 11.5, color: P.PALE, lineSpacing: 16 });
+      s.addShape(pres.ShapeType.roundRect, { x, y: TOP - 0.04, w: kw, h: 1.44, fill: { color: P.DARK2 }, rectRadius: 0.1 });
+      dot(s, x + kw - 0.66, TOP + 0.2, 0.4, i === 2 ? P.AMBER : P.SEA);
+      s.addImage({ data: IC.check, x: x + kw - 0.56, y: TOP + 0.3, w: 0.2, h: 0.2 });
+      T(s, k[0], { x: x + 0.24, y: TOP + 0.18, w: kw - 0.98, h: 0.34, fontSize: 15, bold: true, color: P.WHITE });
+      T(s, k[1], { x: x + 0.24, y: TOP + 0.62, w: kw - 0.48, h: 0.68, fontSize: 11.5, color: P.PALE, lineSpacing: 16 });
     });
 
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 3.42, w: W - 2 * M, h: 0.92, fill: { color: P.DARK2 }, line: { color: P.TEAL, width: 1 }, rectRadius: 0.1 });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 3.36, w: W - 2 * M, h: 0.86, fill: { color: P.DARK2 }, line: { color: P.TEAL, width: 1 }, rectRadius: 0.1 });
     T(s, 'النظام لا يصنع الحلّ وحده؛ لكنه يمنح من يديرون المخيم ما يحتاجونه ليتّخذوا قرارًا عادلًا في وقته',
-      { x: M + 0.4, y: 3.42, w: W - 2 * M - 0.8, h: 0.92, fontSize: 14, bold: true, color: P.SEA, align: 'center', valign: 'middle' });
+      { x: M + 0.4, y: 3.36, w: W - 2 * M - 0.8, h: 0.86, fontSize: 14, bold: true, color: P.SEA, align: 'center', valign: 'middle' });
 
-    T(s, 'شكرًا لحسن استماعكم', { x: M, y: 4.72, w: W - 2 * M, h: 0.72, fontSize: 34, bold: true, color: P.WHITE, align: 'center' });
-    T(s, 'ويسعدنا أن نستمع إلى أسئلتكم وملاحظاتكم', { x: M, y: 5.46, w: W - 2 * M, h: 0.4, fontSize: 14, color: P.SEA, align: 'center' });
+    T(s, 'شكرًا لحسن استماعكم', { x: M, y: 4.62, w: W - 2 * M, h: 0.74, fontSize: 34, bold: true, color: P.WHITE, align: 'center' });
+    T(s, 'ويسعدنا أن نستمع إلى أسئلتكم وملاحظاتكم', { x: M, y: 5.38, w: W - 2 * M, h: 0.4, fontSize: 14, color: P.SEA, align: 'center' });
 
-    s.addShape(pres.ShapeType.roundRect, { x: M, y: 6.06, w: W - 2 * M, h: 1.0, fill: { color: P.DARK2 }, rectRadius: 0.1 });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.9, w: W - 2 * M, h: 0.9, fill: { color: P.DARK2 }, rectRadius: 0.1 });
     T(s, 'عبد الله أحمد البكور  ·  أحمد خالد الفاضل  ·  محمد أحمد خطيب',
-      { x: M + 0.4, y: 6.18, w: W - 2 * M - 0.8, h: 0.36, fontSize: 13.5, bold: true, color: P.WHITE, align: 'center' });
+      { x: M + 0.4, y: 6.0, w: W - 2 * M - 0.8, h: 0.34, fontSize: 13.5, bold: true, color: P.WHITE, align: 'center' });
     T(s, 'إشراف: المهندسة لبنى الأنيس  —  جامعة الشمال الخاصة',
-      { x: M + 0.4, y: 6.58, w: W - 2 * M - 0.8, h: 0.34, fontSize: 12, color: P.PALE, align: 'center' });
+      { x: M + 0.4, y: 6.36, w: W - 2 * M - 0.8, h: 0.32, fontSize: 12, color: P.PALE, align: 'center' });
+    footer(s, '١٠', true);
 
     s.addNotes(`نختم بثلاث جمل.
 
@@ -482,7 +561,149 @@ async function build() {
 
 ونشكر المهندسة لبنى الأنيس على إشرافها ومتابعتها طوال الفصل، ونشكر جامعة الشمال الخاصة، ونشكر لجنتنا الموقّرة على وقتها. ويسعدنا الآن أن نستمع إلى أسئلتكم وملاحظاتكم.
 
-[أداء] احفظ هذه الخاتمة عن ظهر قلب وقلها من غير نظر إلى الشاشة. ثم اصمت وانتظر الأسئلة من غير ارتباك. الزمن: دقيقة.`);
+[أداء] احفظ هذه الخاتمة عن ظهر قلب وقلها من غير نظر إلى الشاشة. ثم اصمت وانتظر الأسئلة من غير ارتباك، ولا تملأ الصمت بكلام زائد. الزمن: دقيقة.`);
+  }
+
+  // ==================== 11. BACKUP — TECHNOLOGY ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.LIGHT };
+    heading(s, 'التقنيات وبيئة التنفيذ', 'شريحة احتياطية · تُعرض عند السؤال');
+    const rows = [
+      ['إطار العمل', 'Laravel — إطار ويب مفتوح المصدر بلغة PHP'],
+      ['قاعدة البيانات', 'MySQL — قاعدة علائقية تحفظ ترابط السجلّات'],
+      ['الواجهة', 'صفحات ويب عربية بالكامل، باتجاه من اليمين إلى اليسار'],
+      ['إدارة الأكواد', 'Git و GitHub، مع فحص آلي عند كل تعديل'],
+      ['بيئة التطوير', 'XAMPP محليًا، ونشر على خادم عادي دون متطلّبات خاصة'],
+    ];
+    const rw = (W - 2 * M - 0.4) / 2;
+    rows.forEach((r, i) => {
+      const y = TOP + i * 0.72;
+      card(s, W - M - rw, y, rw, 0.62);
+      T(s, r[0], { x: W - M - rw + 0.24, y, w: 1.9, h: 0.62, fontSize: 12, bold: true, color: P.TEAL, valign: 'middle' });
+      T(s, r[1], { x: W - M - rw + 2.2, y, w: rw - 2.44, h: 0.62, fontSize: 11, color: P.MUTED, valign: 'middle' });
+    });
+    const facts = [['٧', 'أدوار بصلاحيات منفصلة'], ['٥', 'وحدات وظيفية مترابطة'], ['٣٤٧', 'اختبارًا آليًا يعمل عند كل تعديل']];
+    const fx = M, fw = rw;
+    T(s, 'وما يدعم الموثوقية', { x: fx, y: TOP, w: fw, h: 0.32, fontSize: 13, bold: true, color: P.TEAL });
+    facts.forEach((f, i) => {
+      const y = TOP + 0.46 + i * 1.0;
+      card(s, fx, y, fw, 0.86);
+      s.addShape(pres.ShapeType.roundRect, { x: fx + fw - 1.3, y: y + 0.16, w: 1.06, h: 0.54, fill: { color: i === 2 ? P.AMBER : P.TEAL }, rectRadius: 0.08 });
+      T(s, f[0], { x: fx + fw - 1.3, y: y + 0.16, w: 1.06, h: 0.54, fontSize: 17, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+      T(s, f[1], { x: fx + 0.24, y, w: fw - 1.72, h: 0.86, fontSize: 12, color: P.INK, valign: 'middle' });
+    });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.7, w: W - 2 * M, h: 1.06, fill: { color: P.DARK }, rectRadius: 0.1 });
+    T(s, 'كل هذه الأدوات مفتوحة المصدر ومجانية الترخيص، ولا يعتمد النظام على أي خدمة خارجية مدفوعة — وهذا شرط عملي في مؤسسة تعمل بتمويل الجهات المانحة',
+      { x: M + 0.5, y: 5.7, w: W - 2 * M - 1.0, h: 1.06, fontSize: 12.5, color: P.PALE, align: 'center', valign: 'middle', lineSpacing: 18 });
+    footer(s, '', false, true);
+
+    s.addNotes(`هذه شريحة احتياطية، نعرضها إن سألتم عن الجانب التقني.
+
+النظام تطبيق ويب مبني بإطار Laravel بلغة PHP، وقاعدة بياناته MySQL — وهي قاعدة علائقية، أي أن ترابط السجلّات محفوظ في القاعدة نفسها لا في الكود، فلا يمكن أن يبقى سجلّ مساعدة معلَّقًا بلا لاجئ.
+
+الواجهة صفحات ويب عربية بالكامل باتجاه من اليمين إلى اليسار، لأن المستخدم النهائي موظف عربي.
+
+وإدارة الأكواد بـ Git و GitHub، مع فحص آلي يعمل عند كل تعديل.
+
+أما ما يدعم الموثوقية فثلاثة أرقام: سبعة أدوار بصلاحيات منفصلة، وخمس وحدات وظيفية مترابطة، وثلاثمئة وسبعة وأربعون اختبارًا آليًا تعمل عند كل تعديل على الكود. وهذه الاختبارات هي ما يجعلنا نقول إن ما عرضناه يعمل فعلًا، لا أنه ادّعاء في عرض تقديمي.
+
+والنقطة الأخيرة عملية: كل هذه الأدوات مفتوحة المصدر ومجانية الترخيص، ولا يعتمد النظام على أي خدمة خارجية مدفوعة. وهذا ليس تفصيلًا تقنيًا؛ إنه شرط بقاء في مؤسسة تعمل بتمويل الجهات المانحة.
+
+[أداء] لا تفتح هذه الشريحة من تلقاء نفسك. انتظر السؤال.`);
+  }
+
+  // ==================== 12. BACKUP — HOW THE ASSISTANT WORKS ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.LIGHT };
+    heading(s, 'كيف يفهم المساعد السؤال', 'شريحة احتياطية · تُعرض عند السؤال');
+    const steps = [
+      ['١', 'توحيد صورة النص', 'تُوحَّد الهمزات والتاء المربوطة والتشكيل والأرقام، فتصير «اين يسكن احمد» و«أين يسكن أحمد» سؤالًا واحدًا'],
+      ['٢', 'مطابقة النيّة', 'سبع عشرة نيّة معرَّفة مسبقًا، وكل واحدة تفحص السؤال: هل يخصّني؟'],
+      ['٣', 'الترجيح بالنقاط', 'لا تجيب النيّة بنعم أو لا، بل بدرجة ثقة. وتفوز صاحبة الدرجة الأعلى، فلا يذهب السؤال إلى غير صاحبه'],
+      ['٤', 'استعلام جاهز', 'تُنفَّذ استعلامًا كتبه مطوّر ويغطّيه اختبار. فلا يولّد النظام استعلامًا من عنده'],
+    ];
+    const pw = (W - 2 * M - 3 * 0.24) / 4;
+    steps.forEach((st, i) => {
+      const x = W - M - pw - i * (pw + 0.24);
+      card(s, x, TOP, pw, 2.5);
+      dot(s, x + pw - 0.82, TOP + 0.24, 0.5, i === 2 ? P.AMBER : P.TEAL);
+      T(s, st[0], { x: x + pw - 0.82, y: TOP + 0.24, w: 0.5, h: 0.5, fontSize: 15, bold: true, color: P.WHITE, align: 'center', valign: 'middle' });
+      T(s, st[1], { x: x + 0.24, y: TOP + 0.28, w: pw - 1.14, h: 0.42, fontSize: 13.5, bold: true, color: P.INK, lineSpacing: 17 });
+      T(s, st[2], { x: x + 0.24, y: TOP + 0.86, w: pw - 0.48, h: 1.42, fontSize: 11, color: P.MUTED, lineSpacing: 16 });
+    });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 4.46, w: W - 2 * M, h: 1.24, fill: { color: P.DARK }, rectRadius: 0.1 });
+    T(s, 'وهذا ليس نموذجًا لغويًا خارجيًا', { x: M + 0.4, y: 4.62, w: W - 2 * M - 0.8, h: 0.32, fontSize: 13.5, bold: true, color: P.SEA, align: 'center' });
+    T(s, 'لا تغادر بيانات اللاجئين خادم النظام، ولا يُرسَل السؤال إلى أي جهة خارجية. وكل إجابة تعود إلى استعلام مكتوب ومُختبَر، لا إلى توليد نصّ',
+      { x: M + 0.6, y: 5.02, w: W - 2 * M - 1.2, h: 0.56, fontSize: 12, color: P.PALE, align: 'center', lineSpacing: 17 });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.9, w: W - 2 * M, h: 0.86, fill: { color: P.TINT_A }, rectRadius: 0.1 });
+    T(s, 'وإن لم يفهم السؤال: يُمرَّر إلى بحث شامل في اللاجئين والأسر والوحدات والجهات، ثم تُعرض أمثلة يفهمها النظام. فلا يُقابَل المستخدم بصمت ولا برسالة خطأ',
+      { x: M + 0.5, y: 5.9, w: W - 2 * M - 1.0, h: 0.86, fontSize: 12, color: 'A0532F', align: 'center', valign: 'middle', lineSpacing: 17 });
+    footer(s, '', false, true);
+
+    s.addNotes(`شريحة احتياطية ثانية، للسؤال المتوقّع: كيف يفهم المساعد السؤال؟
+
+بأربع مراحل.
+
+الأولى: توحيد صورة النص. العربية تُكتب بأكثر من صورة — بالهمزة وبغيرها، بالتشكيل وبغيره، بالأرقام العربية والهندية. فنوحّد الصورة أولًا حتى يصير «اين يسكن احمد» و«أين يسكن أحمد» سؤالًا واحدًا داخل النظام.
+
+الثانية: مطابقة النيّة. لدينا سبع عشرة نيّة معرَّفة مسبقًا، وكل واحدة تفحص السؤال وتجيب عن سؤال واحد: هل هذا السؤال يخصّني؟
+
+الثالثة، وهي ألطف جزئية في التصميم: النيّة لا تجيب بنعم أو لا، بل بدرجة ثقة. ثم تفوز صاحبة الدرجة الأعلى. ولهذا فائدة عملية: جملة «أين يسكن أحمد» وجملة «كم شخصًا بلا سكن» تشتركان في كلمة «سكن»، ولو أخذنا أول تطابق لأجاب النظام إجابة خاطئة بثقة تامة. النقاط هي ما يجعل السؤال يذهب إلى صاحبه.
+
+الرابعة: تنفيذ استعلام جاهز كتبه مطوّر ويغطّيه اختبار. فالنظام لا يولّد استعلامًا من عنده.
+
+وأهمّ ما في هذه الشريحة هو الشريط الأسفل: هذا ليس نموذجًا لغويًا خارجيًا. بيانات اللاجئين لا تغادر خادم النظام، والسؤال لا يُرسَل إلى أي جهة. وهذا اختيار متعمَّد لا قصور في الإمكانات: بيانات اللاجئين لا يجوز أن تمرّ بخدمة لا نملكها.
+
+وأخيرًا: إن لم يفهم المساعد السؤال، لا يقابله بصمت ولا برسالة خطأ. يمرّره إلى بحث شامل، ثم يعرض أمثلة يفهمها. فالمستخدم يخرج من كل سؤال بخطوة تالية.
+
+[أداء] هذه أقوى شريحة تملكها أمام لجنة هندسية. لا تعرضها إلا إن سُئلت، وحين تعرضها تحدّث بثقة.`);
+  }
+
+  // ==================== 13. BACKUP — LIMITS ====================
+  {
+    const s = pres.addSlide();
+    s.background = { color: P.LIGHT };
+    heading(s, 'حدود المشروع وما لم يُنجز بعد', 'شريحة احتياطية · ما نصرّح به من تلقاء أنفسنا');
+    const lim = [
+      ['البيانات الحالية اختبارية', 'النظام لم يُشغَّل في مخيم حقيقي بعد؛ ما نعرضه بيانات مولَّدة للاختبار', 'الخطوة التالية: تجربة محدودة مع جهة واحدة قبل التوسّع'],
+      ['لا يعمل دون اتصال', 'يتطلّب اتصالًا بالخادم، والاتصال في بيئة المخيمات غير مضمون', 'الخطوة التالية: التطبيق الميداني بقدرة على العمل ثم المزامنة'],
+      ['لا تكامل مباشر مع المنظمات', 'التقارير تُصدَّر يدويًا، ولا توجد قناة تبادل آلية بعد', 'الخطوة التالية: واجهة تبادل آمنة حسب معايير الجهة المستقبِلة'],
+      ['المساعد يفهم ما عُرِّف له', 'يغطّي أسئلة أربعة محاور؛ وما خرج عنها يُحال إلى البحث الشامل', 'الخطوة التالية: توسيع النوايا بحسب ما يسأله المستخدمون فعلًا'],
+    ];
+    const cw3 = (W - 2 * M - 0.3) / 2;
+    lim.forEach((l, i) => {
+      const col = i % 2, row = Math.floor(i / 2);
+      const x = col === 0 ? W - M - cw3 : M;
+      const y = TOP + row * 1.66;
+      card(s, x, y, cw3, 1.46);
+      dot(s, x + cw3 - 0.74, y + 0.2, 0.42, P.AMBER);
+      s.addImage({ data: IC.warn, x: x + cw3 - 0.635, y: y + 0.31, w: 0.21, h: 0.21 });
+      T(s, l[0], { x: x + 0.24, y: y + 0.16, w: cw3 - 1.04, h: 0.32, fontSize: 13.5, bold: true, color: P.INK });
+      T(s, l[1], { x: x + 0.24, y: y + 0.52, w: cw3 - 0.48, h: 0.38, fontSize: 11, color: P.MUTED, lineSpacing: 15 });
+      s.addShape(pres.ShapeType.roundRect, { x: x + 0.24, y: y + 0.94, w: cw3 - 0.48, h: 0.38, fill: { color: P.TINT_T }, rectRadius: 0.06 });
+      T(s, l[2], { x: x + 0.4, y: y + 0.94, w: cw3 - 0.8, h: 0.38, fontSize: 10.5, bold: true, color: P.TEAL, valign: 'middle' });
+    });
+    s.addShape(pres.ShapeType.roundRect, { x: M, y: 5.36, w: W - 2 * M, h: 1.4, fill: { color: P.DARK }, rectRadius: 0.1 });
+    T(s, 'لماذا نعرض هذه الشريحة أصلًا', { x: M + 0.4, y: 5.54, w: W - 2 * M - 0.8, h: 0.32, fontSize: 13.5, bold: true, color: P.SEA, align: 'center' });
+    T(s, 'لأن معرفة حدود ما بنيناه جزء من فهمه. ونفضّل أن نذكرها نحن بدقّة، مع الخطوة التالية لكلٍّ منها، على أن تُكتشف في سؤال',
+      { x: M + 0.6, y: 5.96, w: W - 2 * M - 1.2, h: 0.64, fontSize: 12.5, color: P.PALE, align: 'center', lineSpacing: 18 });
+    footer(s, '', false, true);
+
+    s.addNotes(`وهذه شريحة احتياطية ثالثة، نعرضها من تلقاء أنفسنا إن اتّسع الوقت، أو حين يُسأل عن حدود المشروع.
+
+الحدّ الأول، وهو الأهمّ: البيانات التي نعرضها اختبارية. النظام لم يُشغَّل في مخيم حقيقي بعد. وما بنيناه هو نظام عامل ومختبَر، لكنه لم يمرّ بتجربة ميدانية. والخطوة التالية تجربة محدودة مع جهة واحدة قبل أي توسّع.
+
+الحدّ الثاني: النظام يتطلّب اتصالًا بالخادم. والاتصال في بيئة المخيمات غير مضمون، وهذا قيد حقيقي على الاستخدام الميداني. والخطوة التالية هي التطبيق المحمول القادر على العمل ثم المزامنة.
+
+الحدّ الثالث: لا يوجد تكامل آلي مع المنظمات بعد؛ التقارير تُصدَّر يدويًا.
+
+الحدّ الرابع: المساعد يفهم ما عُرِّف له من أسئلة، وما خرج عن ذلك يُحال إلى البحث الشامل. وهو ليس نظامًا يفهم كل جملة عربية، ولا ندّعي ذلك.
+
+ولماذا نعرض هذه الشريحة أصلًا؟ لأن معرفة حدود ما بنيناه جزء من فهمه. ونفضّل أن نذكرها نحن بدقّة، ومعها الخطوة التالية لكل حدّ، على أن تُكتشف في سؤال فنبدو كمن لم ينتبه إليها.
+
+[أداء] إن عرضتها فاعرضها بثقة لا باعتذار. الصياغة الصحيحة: «هذه حدود واعية، ولكلٍّ منها خطوة تالية محدَّدة».`);
   }
 
   const out = process.argv[2] || 'presentation-strategic.pptx';
