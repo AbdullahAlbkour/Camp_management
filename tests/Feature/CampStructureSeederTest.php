@@ -120,6 +120,23 @@ class CampStructureSeederTest extends TestCase
         $this->assertSame(0, $headless);
     }
 
+    public function test_no_family_holds_two_people_with_the_same_name(): void
+    {
+        $this->runSeeder();
+
+        // Households are handed out on a fixed stride, so members of one family
+        // sit an exact multiple of the name list apart. Picking the first name
+        // by "index modulo twenty" therefore gave all three members of a family
+        // the same name — three sisters called هدى مصطفى النجار.
+        $collisions = Household::where('household_code', 'like', 'FAM-%')
+            ->with('members')
+            ->get()
+            ->filter(fn (Household $household) => $household->members->count()
+                !== $household->members->unique(fn (Refugee $member) => $member->full_name)->count());
+
+        $this->assertCount(0, $collisions, 'A family was given two members with the same full name.');
+    }
+
     public function test_it_runs_without_the_faker_package(): void
     {
         // Faker lives in require-dev, so an install done with --no-dev — the

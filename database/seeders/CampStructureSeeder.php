@@ -242,7 +242,12 @@ class CampStructureSeeder extends Seeder
         // instead of moving together and producing twenty names for two hundred
         // people. Some full names still land twice, which is wanted: it is what
         // exercises the assistant's ambiguous-name answer.
-        $firstName = $names[intdiv($index, 2) % count($names)];
+        // Rotated by the block number as well as by the index. Households are
+        // handed out on a fixed stride, so two members of one family sit an
+        // exact multiple of the name list apart — and a plain "index modulo
+        // twenty" gave every one of them the same first name, which read as
+        // three sisters all called هدى مصطفى النجار.
+        $firstName = $names[($index + 3 * intdiv($index, count($names))) % count($names)];
         $fatherName = self::MALE_NAMES[($index * 3 + 5) % count(self::MALE_NAMES)];
         // "أحمد أحمد الحسن" reads as a data-entry slip rather than as a name.
         if ($fatherName === $firstName) {

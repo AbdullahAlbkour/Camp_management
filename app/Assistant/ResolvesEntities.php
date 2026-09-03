@@ -176,7 +176,15 @@ trait ResolvesEntities
     {
         $base = Refugee::query()->with(['currentCamp', 'currentShelter', 'household']);
 
-        foreach ($query->codes() as $code) {
+        // codeCandidates() first: it keeps a hyphenated code whole, and the
+        // question's own tokens have already been split on the hyphen. Without
+        // it "POP-000095" arrives here as the bare "000095", never equals the
+        // stored "POP-000095", and falls through to the record-number lookup
+        // below — which used to answer with whichever refugee happened to hold
+        // id 95, under the document number that was asked for.
+        $codes = array_values(array_unique(array_merge($this->codeCandidates($query), $query->codes())));
+
+        foreach ($codes as $code) {
             // Folding lowercases the term, so the comparison has to lowercase the
             // column too — "DOC55443" as stored would otherwise never equal
             // "doc55443" as typed.
@@ -192,9 +200,7 @@ trait ResolvesEntities
             }
         }
 
-        // A badge reads REF-000123; the folded form leaves the digits behind, so
-        // an id lookup covers both "REF-000123" and a bare record number.
-        foreach ($query->numbers() as $number) {
+        foreach ($this->recordNumbersIn($query) as $number) {
             $byId = (clone $base)->whereKey($number)->get();
 
             if ($byId->isNotEmpty()) {
@@ -221,6 +227,41 @@ trait ResolvesEntities
             })
             ->limit($limit)
             ->get();
+    }
+
+    /**
+     * The numbers in a question that actually name a record.
+     *
+     * A badge reads REF-000123, and a number typed on its own is a record
+     * number; both point at a row id. Digits taken out of any other code do
+     * not: "POP-000095" is a document number, and a record-id lookup on 95
+     * returns a different person's file under the number that was asked for —
+     * a wrong answer given with the same confidence as a right one, which is
+     * the one failure this assistant is built not to produce. So an identifier
+     * that carries letters is either matched as the code it is, or not matched
+     * at all.
+     *
+     * @return list<int>
+     */
+    private function recordNumbersIn(AssistantQuery $query): array
+    {
+        $numbers = [];
+
+        foreach ($this->codeCandidates($query) as $code) {
+            if (preg_match('/^(?:ref-)?0*(\d+)$/u', $code, $matches) === 1) {
+                $numbers[] = (int) $matches[1];
+            }
+        }
+
+        // codeCandidates() ignores single characters, so a one-digit record
+        // number is picked up from the tokens instead.
+        foreach ($query->words as $word) {
+            if (preg_match('/^\d$/u', $word) === 1) {
+                $numbers[] = (int) $word;
+            }
+        }
+
+        return array_values(array_unique($numbers));
     }
 
     /**

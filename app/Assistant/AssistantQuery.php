@@ -165,15 +165,48 @@ final class AssistantQuery
             array_merge(self::STOPWORDS, $triggers)
         );
 
-        $kept = array_filter($this->words, function (string $word) use ($drop): bool {
+        $codeWords = $this->codeWords();
+
+        $kept = array_filter($this->words, function (string $word) use ($drop, $codeWords): bool {
             $bare = $this->stripPrefixes($word);
 
             return ! in_array($word, $drop, true)
                 && ! in_array($bare, $drop, true)
+                && ! in_array($word, $codeWords, true)
                 && preg_match('/^\d+$/u', $word) !== 1;
         });
 
         return trim(implode(' ', $kept));
+    }
+
+    /**
+     * The pieces a hyphenated identifier breaks into — "pop" and "000095" out
+     * of "POP-000095".
+     *
+     * subject() drops the digits already. Leaving the letters behind turns a
+     * document number that matched nothing into a name search for "pop", which
+     * matches every document number in the register — six strangers offered as
+     * the answer to a question about one person.
+     *
+     * @return list<string>
+     */
+    private function codeWords(): array
+    {
+        preg_match_all('/[a-z0-9]+(?:-[a-z0-9]+)+/u', $this->text, $matches);
+
+        $words = [];
+
+        foreach ($matches[0] as $code) {
+            if (preg_match('/\d/u', $code) !== 1) {
+                continue;
+            }
+
+            foreach (explode('-', $code) as $part) {
+                $words[] = $part;
+            }
+        }
+
+        return array_values(array_unique($words));
     }
 
     private function stripPrefixes(string $word): string

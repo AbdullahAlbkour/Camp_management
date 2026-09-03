@@ -33,6 +33,99 @@ class AssistantExpandedIntentsTest extends TestCase
         return $response->json('answer');
     }
 
+    // ------------------------------------------------------------- identifiers
+
+    public function test_a_document_number_returns_the_person_who_holds_it(): void
+    {
+        $this->actingAsRole('admin');
+        $camp = Camp::factory()->create();
+
+        // Row ids and document numbers are deliberately out of step, which is
+        // what the live register looks like: the seeder's POP-000095 sits on
+        // id 96 because another seeder created a refugee first. The lookup used
+        // to fall through to a record-id search and answer POP-000095 with
+        // whoever held id 95 — a different person's file, under the number that
+        // was asked for, phrased as an exact match.
+        $others = Refugee::factory()->count(3)->create(['current_camp_id' => $camp->id]);
+        $wanted = Refugee::factory()->create([
+            'current_camp_id' => $camp->id,
+            'document_number' => 'POP-000095',
+            'first_name' => 'سامر',
+            'father_name' => 'باسل',
+            'last_name' => 'الخوري',
+        ]);
+        $decoy = Refugee::factory()->create([
+            'current_camp_id' => $camp->id,
+            'document_number' => 'POP-000200',
+            'first_name' => 'سلمى',
+        ]);
+        // The decoy holds the id the digits of the wanted document point at.
+        $decoy->forceFill(['id' => 95])->save();
+
+        $answer = $this->ask('POP-000095');
+
+        $this->assertSame('refugee_lookup', $answer['intent']);
+        $this->assertCount(1, $answer['items']);
+        $this->assertStringContainsString('سامر', $answer['items'][0]['title']);
+        $this->assertStringNotContainsString('سلمى', $answer['items'][0]['title']);
+        $this->assertNotSame($wanted->id, $decoy->id);
+        $this->assertSame(3, $others->count());
+    }
+
+    public function test_a_document_number_that_matches_nothing_is_reported_missing(): void
+    {
+        $this->actingAsRole('admin');
+        $camp = Camp::factory()->create();
+        Refugee::factory()->count(4)->create(['current_camp_id' => $camp->id, 'document_number' => null]);
+        Refugee::factory()->create(['current_camp_id' => $camp->id, 'document_number' => 'POP-000001']);
+
+        $answer = $this->ask('POP-999999');
+
+        // Not a list of strangers: the letters of an unmatched code used to
+        // survive into the name search, and "pop" matches every document
+        // number in the register.
+        $this->assertSame('refugee_lookup', $answer['intent']);
+        $this->assertSame([], $answer['items']);
+        $this->assertStringContainsString('لم أجد', $answer['text']);
+        $this->assertStringContainsString('POP-999999', $answer['text']);
+    }
+
+    public function test_a_badge_code_still_resolves_by_record_number(): void
+    {
+        $this->actingAsRole('admin');
+        $camp = Camp::factory()->create();
+        $refugee = Refugee::factory()->create([
+            'current_camp_id' => $camp->id,
+            'document_number' => 'POP-000700',
+            'first_name' => 'وفاء',
+        ]);
+
+        // A badge names the row, not the document, so this one has to keep
+        // working after the record-id lookup was narrowed.
+        $answer = $this->ask(sprintf('REF-%06d', $refugee->id));
+
+        $this->assertCount(1, $answer['items']);
+        $this->assertStringContainsString('وفاء', $answer['items'][0]['title']);
+    }
+
+    public function test_a_document_number_reaches_the_other_identifier_intents(): void
+    {
+        $this->actingAsRole('admin');
+        $camp = Camp::factory()->create(['name' => 'مخيم النور']);
+        $shelter = Shelter::factory()->capacity(4)->create(['camp_id' => $camp->id, 'code' => 'B-07']);
+        Refugee::factory()->count(2)->create(['current_camp_id' => $camp->id]);
+        Refugee::factory()->inShelter($shelter->id, $camp->id)->create([
+            'document_number' => 'POP-000042',
+            'first_name' => 'ماهر',
+            'presence_status' => 'inside',
+        ]);
+
+        // refugeesIn() is shared, so every intent that takes a person by
+        // identifier was reaching the wrong row the same way.
+        $this->assertStringContainsString('ماهر', $this->ask('أين يسكن POP-000042؟')['text']);
+        $this->assertStringContainsString('ماهر', $this->ask('هل POP-000042 داخل المخيم؟')['text']);
+    }
+
     // ---------------------------------------------------------------- housing
 
     public function test_a_unit_is_looked_up_by_its_hyphenated_code(): void
