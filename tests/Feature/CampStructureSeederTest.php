@@ -120,6 +120,88 @@ class CampStructureSeederTest extends TestCase
         $this->assertSame(0, $headless);
     }
 
+    public function test_it_runs_without_the_faker_package(): void
+    {
+        // Faker lives in require-dev, so an install done with --no-dev — the
+        // normal way to set this application up on the machine that will use it
+        // — does not have it. A factory call anywhere in this path would fail
+        // there as "Call to a member function on null", which names neither the
+        // cause nor the cure, so the dependency is asserted away rather than
+        // left to be discovered on someone else's XAMPP.
+        foreach ([
+            'database/seeders/CampStructureSeeder.php',
+            'database/factories/CampFactory.php',
+        ] as $file) {
+            $code = $this->sourceWithoutComments(base_path($file));
+
+            $this->assertStringNotContainsStringIgnoringCase('faker', $code, $file.' still reaches for Faker.');
+            $this->assertStringNotContainsString('fake(', $code, $file.' still reaches for Faker.');
+            $this->assertStringNotContainsString('::factory(', $code, $file.' still builds rows through a factory, which needs Faker.');
+        }
+    }
+
+    public function test_the_population_is_written_in_arabic(): void
+    {
+        $this->runSeeder();
+
+        // Matched in PHP rather than in SQL: SQLite ships without REGEXP, and
+        // the suite runs on it while the application runs on MySQL.
+        $latin = Refugee::where('document_number', 'like', 'POP-%')
+            ->pluck('first_name')
+            ->merge(Refugee::where('document_number', 'like', 'POP-%')->pluck('last_name'))
+            ->filter(fn (string $name) => preg_match('/[A-Za-z]/', $name) === 1)
+            ->count();
+
+        // Faker's defaults wrote English names into an Arabic register, which
+        // made every screenshot of the fixture look like what it was.
+        $this->assertSame(0, $latin);
+    }
+
+    public function test_two_runs_produce_the_same_fixture(): void
+    {
+        // Nothing here draws a random number, so the same code has to describe
+        // the same camp on every machine — which is what lets a figure quoted
+        // from a screenshot still match the database a month later.
+        $this->runSeeder();
+        $first = $this->fingerprint();
+
+        $this->runSeeder();
+
+        $this->assertSame($first, $this->fingerprint());
+    }
+
+    /**
+     * The seeded population reduced to the columns that decide what the screens
+     * show, in a stable order.
+     */
+    private function fingerprint(): string
+    {
+        return Refugee::where('document_number', 'like', 'POP-%')
+            ->orderBy('document_number')
+            ->get(['document_number', 'first_name', 'father_name', 'last_name', 'gender', 'date_of_birth', 'housing_status', 'presence_status'])
+            ->map(fn (Refugee $refugee) => implode('|', [
+                $refugee->document_number,
+                $refugee->full_name,
+                $refugee->gender,
+                $refugee->date_of_birth?->toDateString(),
+                $refugee->housing_status,
+                $refugee->presence_status,
+            ]))
+            ->implode("\n");
+    }
+
+    /**
+     * Source with comments stripped, so a mention of Faker in a docblock does
+     * not fail the assertion that the code does not use it.
+     */
+    private function sourceWithoutComments(string $path): string
+    {
+        return collect(token_get_all((string) file_get_contents($path)))
+            ->reject(fn ($token) => is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true))
+            ->map(fn ($token) => is_array($token) ? $token[1] : $token)
+            ->implode('');
+    }
+
     public function test_running_it_twice_does_not_duplicate_or_collide(): void
     {
         // The run is deterministic, so a second pass regenerates the same unique
